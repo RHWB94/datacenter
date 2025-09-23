@@ -1,0 +1,48 @@
+<!-- reply/index.html -->
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登入｜回條系統</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./config.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>回條系統 ‑ 登入（A 頁）</h1>
+      <span class="badge">MVP</span>
+    </header>
+
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label for="selClass">班級</label>
+          <select id="selClass"></select>
+        </div>
+        <div class="col">
+          <label for="selName">姓名</label>
+          <select id="selName"></select>
+        </div>
+        <div class="col">
+          <label for="inpPIN">PIN（學生 5 碼；管理者輸入管理金鑰）</label>
+          <input id="inpPIN" maxlength="64" autocomplete="off" placeholder="例如：12345 或 admin-token">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col">
+          <button id="btnLogin">登入</button>
+        </div>
+        <div class="col">
+          <button class="secondary" id="btnClear">清除</button>
+        </div>
+      </div>
+      <p class="note" id="adminHint"></p>
+    </div>
+
+    <footer>© 回條系統</footer>
+  </div>
+</body>
+</html>

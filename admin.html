@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>仁和管樂回條系統 - 管理端</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>仁和管樂回條系統</h1>
+    <p class="subtitle">管理端・統計與匯出</p>
+  </header>
+
+  <main class="app-main">
+    <section id="admin-login-section" class="card">
+      <h2>管理員登入</h2>
+      <form id="admin-login-form" class="form">
+        <label class="form-label">
+          管理員 Token
+          <input type="password" name="adminToken" placeholder="請貼上管理員 token" required />
+        </label>
+        <button type="submit" class="btn primary full-width">登入</button>
+      </form>
+      <p id="admin-login-error" class="error-text hidden"></p>
+    </section>
+
+    <section id="admin-section" class="hidden">
+      <div class="card">
+        <div class="student-info">
+          <div>
+            <div class="student-name">管理員模式</div>
+            <div class="student-class muted">可查看回覆統計與匯出資料</div>
+          </div>
+          <button id="admin-logout-btn" class="btn secondary small">登出</button>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2>活動回覆統計</h2>
+        <div id="summary-container"></div>
+        <p id="summary-empty" class="muted hidden">目前尚無活動或名單。</p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>仁和國中管樂團・回條系統（管理端）</p>
+  </footer>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="assets/js/state.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

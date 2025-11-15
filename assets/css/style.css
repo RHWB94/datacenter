@@ -1,4 +1,3 @@
-
 :root {
   --bg: #f5f5f7;
   --card-bg: #ffffff;
@@ -248,6 +247,67 @@ body {
   min-height: 80px;
 }
 
+/* 同意書文字 */
+.textblock {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
+
+/* 簽名 UI */
+.signature-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.signature-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.signature-panel.hidden {
+  display: none;
+}
+
+.signature-canvas {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+
+.signature-preview {
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  padding: 0.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.signature-preview.hidden {
+  display: none;
+}
+
+.signature-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.signature-actions {
+  margin-top: 0.25rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
 /* Toast */
 .toast {
   position: fixed;
@@ -294,4 +354,94 @@ body {
   .card {
     padding: 1.5rem 1.75rem 1.75rem;
   }
+}
+
+/* ===== Signature Modal (桌機 / 平板 / 手機共用) ===== */
+.signature-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 900;
+}
+
+.signature-modal.active {
+  display: flex;
+}
+
+
+.signature-modal-content {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 桌機 / 平板：約 70% 視窗 */
+@media (min-width: 768px) {
+  .signature-modal-content {
+    width: 70vw;
+    max-height: 70vh;
+  }
+}
+
+/* 高:寬 = 9:16 => 寬:高 = 16:9 的橫向簽名區 */
+.signature-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.signature-canvas-wrapper.is-rotated {
+  /* 轉向時維持 16:9，僅透過外層旋轉視覺 */
+}
+
+
+.signature-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.signature-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+
+@media (max-width: 767px) {
+  .signature-modal {
+    padding: 0.5rem;
+  }
+  .signature-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90vh;
+    padding: 0.5rem;
+  }
+  .signature-modal-footer {
+    margin-top: 0.25rem;
+  }
+}
+
+
+/* 放大簽名板下方按鈕尺寸約 20% */
+.signature-modal-footer .btn.small {
+  padding: 0.4rem 1.1rem;
+  font-size: 0.9rem;
 }

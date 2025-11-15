@@ -20,14 +20,18 @@ async function apiGet(params) {
 async function apiPost(fn, body) {
   const url = new URL(API_BASE);
   url.searchParams.set('fn', fn);
+
   const res = await fetch(url.toString(), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    // 不手動設定 Content-Type，讓瀏覽器自動帶 text/plain，
+    // 這樣就不會觸發 CORS preflight。
     body: JSON.stringify(body || {})
   });
+
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return await res.json();
 }
+
 
 // Student APIs
 async function authStudent(cls, name, pin) {

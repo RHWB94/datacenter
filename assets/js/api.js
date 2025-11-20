@@ -38,8 +38,8 @@ async function authStudent(cls, name, pin) {
   return await apiPost('auth', { class: cls, name: name, pin: pin });
 }
 
-async function getEvents() {
-  return await apiGet({ fn: 'events' });
+async function getEvents(cls, name) {
+  return await apiGet({ fn: 'events', class: cls, name: name });
 }
 
 async function getEvent(eventId) {
@@ -67,6 +67,10 @@ async function adminSummary(adminToken) {
   return await apiGet({ fn: 'adminSummary', adminToken });
 }
 
-async function adminExportCSV(adminToken, eventId) {
-  return await apiGet({ fn: 'adminExportCSV', adminToken, eventId });
+async function adminEventDetail(adminToken, eventId) {
+  return await apiGet({
+    fn: 'adminEventDetail',
+    adminToken,
+    eventId
+  });
 }

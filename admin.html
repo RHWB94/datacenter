@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -10,10 +9,11 @@
 <body>
   <header class="app-header">
     <h1>仁和管樂回條系統</h1>
-    <p class="subtitle">管理端・統計與匯出</p>
+    <p class="subtitle">管理端・統計與查詢</p>
   </header>
 
   <main class="app-main">
+    <!-- 管理員登入區 -->
     <section id="admin-login-section" class="card">
       <h2>管理員登入</h2>
       <form id="admin-login-form" class="form">
@@ -26,21 +26,90 @@
       <p id="admin-login-error" class="error-text hidden"></p>
     </section>
 
+    <!-- 已登入管理區 -->
     <section id="admin-section" class="hidden">
       <div class="card">
         <div class="student-info">
           <div>
             <div class="student-name">管理員模式</div>
-            <div class="student-class muted">可查看回覆統計與匯出資料</div>
+            <div class="student-class muted">可查看回覆統計與各活動詳細內容</div>
           </div>
           <button id="admin-logout-btn" class="btn secondary small">登出</button>
         </div>
       </div>
 
+      <!-- 活動列表總覽 -->
       <section class="card">
         <h2>活動回覆統計</h2>
         <div id="summary-container"></div>
         <p id="summary-empty" class="muted hidden">目前尚無活動或名單。</p>
+      </section>
+
+      <!-- 單一活動詳細結果 -->
+      <section id="event-detail-section" class="card hidden">
+        <div class="event-detail-header" style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+          <div>
+            <h2 id="event-detail-title">活動標題</h2>
+            <p id="event-detail-meta" class="muted" style="font-size:0.9rem;"></p>
+          </div>
+          <button id="event-detail-back" class="btn secondary small">返回活動列表</button>
+        </div>
+
+        <div id="event-detail-content" class="muted" style="margin-top:0.75rem; white-space:pre-wrap; font-size:0.92rem;"></div>
+
+        <p id="event-detail-stats" class="muted" style="margin-top:0.5rem; font-size:0.9rem;"></p>
+
+        <!-- 顯示模式切換：已回覆 vs 已回覆 + 未回覆 -->
+        <div class="event-detail-toolbar" style="margin-top:0.75rem; display:flex; justify-content:flex-end; align-items:center;">
+          <label class="detail-toggle" style="font-size:0.85rem; color:#6b7280; display:inline-flex; align-items:center; gap:0.4rem;">
+            <input type="checkbox" id="detail-show-unreplied" />
+            <span>同時顯示未回覆名單</span>
+          </label>
+        </div>
+
+        <div class="table-wrapper" style="margin-top:1rem; overflow-x:auto;">
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>班級</th>
+                <th>樂器</th>
+                <th>結果</th>
+                <th>簽名</th>
+              </tr>
+            </thead>
+            <tbody id="event-detail-tbody">
+              <tr><td colspan="5" class="muted">尚未選擇活動。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 下半部：未回覆名單（預設隱藏） -->
+        <div id="event-detail-unreplied" class="table-wrapper hidden" style="margin-top:1rem; overflow-x:auto;">
+          <h3 style="margin:0 0 0.4rem; font-size:0.95rem; color:#6b7280;">未回覆名單</h3>
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>班級</th>
+                <th>樂器</th>
+              </tr>
+            </thead>
+            <tbody id="event-detail-unreplied-tbody">
+              <tr><td colspan="3" class="muted">尚未選擇活動。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+                <!-- 簽名顯示區 -->
+        <div id="signature-viewer" class="hidden" style="margin-top:1.5rem;">
+          <h3 style="margin-bottom:0.25rem;">家長簽名</h3>
+          <p id="signature-viewer-info" class="muted" style="font-size:0.9rem; margin-bottom:0.5rem;"></p>
+          <div style="border:1px solid #ddd; border-radius:4px; padding:0.5rem; background:#fafafa;">
+            <img id="signature-viewer-image" alt="家長簽名" style="width:400px; max-width:100%; height:auto; display:block; margin:0 auto;" />
+          </div>
+        </div>
+
       </section>
     </section>
   </main>

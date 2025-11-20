@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -16,7 +15,15 @@
   <main class="app-main">
     <section id="login-section" class="card">
       <h2>學生登入</h2>
-      <form id="login-form" class="form">
+      <form id="login-form" class="form" autocomplete="off">
+        <!-- 隱藏假密碼欄，降低瀏覽器自動填寫真正 PIN 欄位的機率 -->
+        <input
+          type="password"
+          style="position:absolute; left:-9999px; top:-9999px;"
+          tabindex="-1"
+          aria-hidden="true"
+        />
+
         <label class="form-label">
           班級
           <select name="class" id="class-select" required>
@@ -31,7 +38,15 @@
         </label>
         <label class="form-label">
           密碼（5 碼）
-          <input type="password" name="pin" minlength="5" maxlength="5" inputmode="numeric" required />
+          <input
+            type="password"
+            name="pin"
+            minlength="5"
+            maxlength="5"
+            inputmode="numeric"
+            required
+            autocomplete="new-password"
+          />
         </label>
         <button type="submit" class="btn primary full-width">登入</button>
       </form>

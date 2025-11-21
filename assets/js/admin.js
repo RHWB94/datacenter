@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const signatureViewerInfo = document.getElementById('signature-viewer-info');
   const signatureViewerImage = document.getElementById('signature-viewer-image');
 
-  // 目前這一場活動的詳細資料（含 replied / notReplied）
+  // 目前這一場活動的詳細資料（含 replied / notReplied + 是否有搭車欄位）
   let currentEventDetailData = null;
 
   function renderLoggedIn() {
@@ -112,18 +112,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-
   // 依照目前模式（checkbox）繪製「已回覆 / 未回覆」兩個區塊
   function renderEventDetailTables() {
     if (!currentEventDetailData) return;
 
     const replied = currentEventDetailData.replied || [];
     const notReplied = currentEventDetailData.notReplied || [];
+    const hasBus = !!currentEventDetailData.hasBusFields; // 是否有 goBus/backBus 欄位
     const showUnreplied = detailShowUnrepliedToggle && detailShowUnrepliedToggle.checked;
+
+    // 調整表頭去程/回程欄位顯示
+    const detailTable = eventDetailTbody ? eventDetailTbody.closest('table') : null;
+    if (detailTable) {
+      const headerCells = detailTable.querySelectorAll('thead th');
+      if (headerCells.length >= 7) {
+        // index: 0姓名,1班級,2樂器,3結果,4去程,5回程,6簽名
+        if (hasBus) {
+          headerCells[4].style.display = '';
+          headerCells[5].style.display = '';
+        } else {
+          headerCells[4].style.display = 'none';
+          headerCells[5].style.display = 'none';
+        }
+      }
+    }
 
     // ===== 上半部：已回覆名單 =====
     if (!replied.length) {
-      eventDetailTbody.innerHTML = '<tr><td colspan="5" class="muted">目前尚無回覆。</td></tr>';
+      eventDetailTbody.innerHTML =
+        `<tr><td colspan="${hasBus ? 7 : 5}" class="muted">目前尚無回覆。</td></tr>`;
     } else {
       eventDetailTbody.innerHTML = '';
       replied.forEach(row => {
@@ -135,6 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let resultText = '';
         let signatureUrl = '';
+        let goBus = '';
+        let backBus = '';
 
         try {
           const ans = row.answer ? JSON.parse(row.answer) : {};
@@ -152,6 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ans.signature ||
             ans.sign ||
             '';
+          goBus = ans.goBus || '';
+          backBus = ans.backBus || '';
         } catch (e) {
           console.warn('解析 answer 失敗', row.answer, e);
         }
@@ -167,6 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const tdResult = document.createElement('td');
         tdResult.textContent = resultText || '-';
+
+        const tdGoBus = document.createElement('td');
+        tdGoBus.textContent = goBus || '-';
+
+        const tdBackBus = document.createElement('td');
+        tdBackBus.textContent = backBus || '-';
 
         const tdSignature = document.createElement('td');
         const btnSig = document.createElement('button');
@@ -187,6 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.appendChild(tdClass);
         tr.appendChild(tdInstrument);
         tr.appendChild(tdResult);
+
+        if (hasBus) {
+          tr.appendChild(tdGoBus);
+          tr.appendChild(tdBackBus);
+        }
+
         tr.appendChild(tdSignature);
 
         eventDetailTbody.appendChild(tr);
@@ -258,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
       eventDetailContent.classList.add('hidden');
     }
     eventDetailStats.textContent = '載入中…';
-    eventDetailTbody.innerHTML = '<tr><td colspan="5" class="muted">載入中…</td></tr>';
+    eventDetailTbody.innerHTML = '<tr><td colspan="7" class="muted">載入中…</td></tr>';
     signatureViewer.classList.add('hidden');
     setHidden(eventDetailSection, false);
 
@@ -307,12 +340,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
+      // ✅ 判斷這個活動是否有遊覽車欄位（只要有任一回覆帶 goBus/backBus 即為 true）
+      const hasBusFields = replied.some(row => {
+        try {
+          const ans = row.answer ? JSON.parse(row.answer) : {};
+          return !!(ans.goBus || ans.backBus);
+        } catch (e) {
+          return false;
+        }
+      });
+
       // 統計文字
       eventDetailStats.textContent =
         `總人數：${total}　已回覆：${repliedCount}　未回覆：${notRepliedCount}　回覆率：${replyRate}`;
 
-      // 儲存明細資料，交給 renderEventDetailTables 處理（含未回覆名單）
-      currentEventDetailData = { replied, notReplied };
+      // 儲存明細資料，交給 renderEventDetailTables 處理（含未回覆名單 + 是否顯示搭車欄位）
+      currentEventDetailData = { replied, notReplied, hasBusFields };
       renderEventDetailTables();
     } catch (err) {
       console.error(err);

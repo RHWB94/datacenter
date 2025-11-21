@@ -57,6 +57,15 @@ function isConsentEvent(ev){
   return id.endsWith('-consent');
 }
 
+// ✅ 僅特定活動要顯示「去程/回程搭乘遊覽車」選項
+// 請把下面的 '2025-trip-consent' 改成你這次活動的 eventId（可加多個）
+const BUS_TRIP_EVENT_IDS = ['20251213-consent'];
+function isBusTripEvent(ev){
+  if (!ev || !ev.eventId) return false;
+  const id = String(ev.eventId || '');
+  return BUS_TRIP_EVENT_IDS.includes(id);
+}
+
 let _eventsCache = [];
 let _latestCache = [];
 let _currentEvent = null;
@@ -516,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-    async function openEventDetail(eventId, triggerBtn) {
+  async function openEventDetail(eventId, triggerBtn) {
     const session = getStudentSession();
     if (!session) {
       showToast('請先登入');
@@ -597,105 +606,397 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-function buildEventForm(def, existingAnswer, ev) {
-  // eventFormContainer 已在 openEventDetail 中清空並插入 PDF（若有）
+  function buildEventForm(def, existingAnswer, ev) {
+    // eventFormContainer 已在 openEventDetail 中清空並插入 PDF（若有）
 
-  const form = document.createElement('form');
-  form.className = 'form';
+    const form = document.createElement('form');
+    form.className = 'form';
 
-  const isConsent = isConsentEvent(ev);
+    const isConsent = isConsentEvent(ev);
+    const isBusTripConsent = isConsent && isBusTripEvent(ev);
 
-  // 儲存每個簽名欄位目前的狀態（值、pad 等）
-  const signatureStates = {};
+    // 儲存每個簽名欄位目前的狀態（值、pad 等）
+    const signatureStates = {};
 
-  (def.fields || []).forEach(field => {
-    // 同意書活動：上半部只顯示「資訊」（textblock）
-    if (isConsent && field.type !== 'textblock') {
-      return;
-    }
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'form-field';
-
-    // 純文字區塊（同意書內容）
-    if (field.type === 'textblock') {
-      if (field.label) {
-        const title = document.createElement('div');
-        title.textContent = field.label;
-        wrapper.appendChild(title);
+    (def.fields || []).forEach(field => {
+      // 同意書活動：上半部只顯示「資訊」（textblock）
+      if (isConsent && field.type !== 'textblock') {
+        return;
       }
-      const text = document.createElement('div');
-      text.className = 'textblock';
-      text.textContent = field.value || '';
-      wrapper.appendChild(text);
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'form-field';
+
+      // 純文字區塊（同意書內容）
+      if (field.type === 'textblock') {
+        if (field.label) {
+          const title = document.createElement('div');
+          title.textContent = field.label;
+          wrapper.appendChild(title);
+        }
+        const text = document.createElement('div');
+        text.className = 'textblock';
+        text.textContent = field.value || '';
+        wrapper.appendChild(text);
+        form.appendChild(wrapper);
+        return;
+      }
+
+      const label = document.createElement('label');
+      label.textContent = field.label || '';
+      wrapper.appendChild(label);
+
+      if (field.type === 'radio') {
+        const opts = document.createElement('div');
+        opts.className = 'options';
+
+        const current = (existingAnswer && existingAnswer[field.id]) || '';
+
+        (field.options || []).forEach(opt => {
+          const optLabel = document.createElement('label');
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = field.id;
+          input.value = opt;
+          if (opt === current) input.checked = true;
+          optLabel.appendChild(input);
+          optLabel.appendChild(document.createTextNode(' ' + opt));
+          opts.appendChild(optLabel);
+        });
+
+        wrapper.appendChild(opts);
+      } else if (field.type === 'checkbox') {
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = field.id;
+
+        const current = existingAnswer && existingAnswer[field.id];
+        if (current === true || current === 'true' || current === '是' || current === 'on') {
+          input.checked = true;
+        }
+
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.appendChild(input);
+        const text = field.checkboxLabel || field.label || '';
+        if (text) {
+          checkboxLabel.appendChild(document.createTextNode(' ' + text));
+        }
+        wrapper.innerHTML = '';
+        wrapper.appendChild(checkboxLabel);
+      } else if (field.type === 'textarea') {
+        const textarea = document.createElement('textarea');
+        textarea.name = field.id;
+        textarea.placeholder = field.placeholder || '';
+        textarea.value = (existingAnswer && existingAnswer[field.id]) || '';
+        wrapper.appendChild(textarea);
+      } else if (field.type === 'text') {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = field.id;
+        input.placeholder = field.placeholder || '';
+        input.value = (existingAnswer && existingAnswer[field.id]) || '';
+        wrapper.appendChild(input);
+      } else if (field.type === 'signature') {
+        const existingDataUrl = (existingAnswer && existingAnswer[field.id]) || '';
+
+        const container = document.createElement('div');
+        container.className = 'signature-container';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn secondary small';
+        openBtn.textContent = existingDataUrl ? '重新簽名' : '點擊簽名';
+
+        const preview = document.createElement('div');
+        preview.className = 'signature-preview';
+        const img = document.createElement('img');
+        preview.appendChild(img);
+
+        container.appendChild(openBtn);
+        container.appendChild(preview);
+        wrapper.appendChild(container);
+
+        const modal = document.createElement('div');
+        modal.className = 'signature-modal';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'signature-modal-content';
+
+        const canvasWrapper = document.createElement('div');
+        canvasWrapper.className = 'signature-canvas-wrapper';
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'signature-canvas';
+        canvasWrapper.appendChild(canvas);
+        modalContent.appendChild(canvasWrapper);
+
+        const footer = document.createElement('div');
+        footer.className = 'signature-modal-footer';
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'btn secondary small';
+        resetBtn.textContent = '↻';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn secondary small';
+        cancelBtn.textContent = 'X';
+
+        const okBtn = document.createElement('button');
+        okBtn.type = 'button';
+        okBtn.className = 'btn primary small';
+        okBtn.textContent = 'O';
+
+        footer.appendChild(resetBtn);
+        footer.appendChild(cancelBtn);
+        footer.appendChild(okBtn);
+        modalContent.appendChild(footer);
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        const pad = initSignaturePad(canvas);
+
+        const state = {
+          value: existingDataUrl || '',
+          pad,
+          modal,
+          modalContent,
+          canvasWrapper,
+          openBtn,
+          preview,
+          img
+        };
+        signatureStates[field.id] = state;
+
+        function updatePreview() {
+          if (state.value) {
+            state.img.src = state.value;
+            state.preview.classList.remove('hidden');
+            state.openBtn.textContent = '重新簽名';
+          } else {
+            state.img.src = '';
+            state.preview.classList.add('hidden');
+            state.openBtn.textContent = '點擊簽名';
+          }
+          state.openBtn.disabled = false;
+        }
+
+        function openModal() {
+          state.modal.classList.add('active');
+          state.openBtn.disabled = true;
+          state.pad.clear();
+          requestAnimationFrame(() => {
+            state.pad.resize();
+          });
+        }
+
+        function closeModal() {
+          state.modal.classList.remove('active');
+          state.openBtn.disabled = false;
+        }
+
+        updatePreview();
+
+        openBtn.addEventListener('click', () => {
+          openModal();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+          closeModal();
+        });
+
+        okBtn.addEventListener('click', () => {
+          const dataUrl = state.pad.getDataURL();
+          if (!dataUrl) {
+            showToast('請先簽名');
+            return;
+          }
+          state.value = dataUrl;
+          updatePreview();
+          closeModal();
+        });
+
+        resetBtn.addEventListener('click', () => {
+          state.pad.clear();
+        });
+
+      } else {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = field.id;
+        input.value = (existingAnswer && existingAnswer[field.id]) || '';
+        wrapper.appendChild(input);
+      }
+
       form.appendChild(wrapper);
-      return;
-    }
+    });
 
-    const label = document.createElement('label');
-    label.textContent = field.label || '';
-    wrapper.appendChild(label);
+    // === 同意書專用下半部：是否同意 + (可選)遊覽車 + 50字備註 + 家長簽名 ===
+    if (isConsent) {
+      const consentSection = document.createElement('section');
+      consentSection.className = 'reply-section';
 
-    if (field.type === 'radio') {
-      const opts = document.createElement('div');
-      opts.className = 'options';
+      // 問句：是否同意 XXX 出席？
+      const questionP = document.createElement('p');
+      questionP.className = 'reply-question';
 
-      const current = (existingAnswer && existingAnswer[field.id]) || '';
+      const session = getStudentSession();
+      const studentName = session && session.name ? session.name : '';
 
-      (field.options || []).forEach(opt => {
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'reply-question-name';
+      nameSpan.textContent = studentName;
+
+      questionP.append('是否同意「');
+      questionP.appendChild(nameSpan);
+      questionP.append('」出席？');
+      consentSection.appendChild(questionP);
+
+      // 同意 / 不同意 選項
+      const optionsDiv = document.createElement('div');
+      optionsDiv.className = 'reply-consent-options';
+
+      const currentConsent = existingAnswer && existingAnswer.consentChoice;
+
+      ['同意', '不同意'].forEach(val => {
         const optLabel = document.createElement('label');
+        optLabel.className = 'reply-consent-option';
+
         const input = document.createElement('input');
         input.type = 'radio';
-        input.name = field.id;
-        input.value = opt;
-        if (opt === current) input.checked = true;
+        input.name = 'consentChoice';
+        input.value = val;
+        if (currentConsent === val) {
+          input.checked = true;
+        }
+
+        const span = document.createElement('span');
+        span.className = 'reply-consent-label';
+        span.textContent = val;
+
         optLabel.appendChild(input);
-        optLabel.appendChild(document.createTextNode(' ' + opt));
-        opts.appendChild(optLabel);
+        optLabel.appendChild(span);
+        optionsDiv.appendChild(optLabel);
       });
 
-      wrapper.appendChild(opts);
-    } else if (field.type === 'checkbox') {
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.name = field.id;
+      consentSection.appendChild(optionsDiv);
 
-      const current = existingAnswer && existingAnswer[field.id];
-      if (current === true || current === 'true' || current === '是' || current === 'on') {
-        input.checked = true;
+      // ✅ 只有特定活動才顯示「去程/回程搭乘遊覽車」欄位
+      if (isBusTripConsent) {
+        const existingGoBus = existingAnswer && existingAnswer.goBus;
+        const existingBackBus = existingAnswer && existingAnswer.backBus;
+
+        // 去程
+        const goWrapper = document.createElement('div');
+        goWrapper.className = 'reply-bus-field';
+
+        const goLabel = document.createElement('div');
+        goLabel.className = 'reply-bus-label';
+        goLabel.textContent = '去程搭乘遊覽車';
+        goWrapper.appendChild(goLabel);
+
+        const goOptions = document.createElement('div');
+        goOptions.className = 'reply-consent-options';
+
+        ['是', '否'].forEach(val => {
+          const optLabel = document.createElement('label');
+          optLabel.className = 'reply-consent-option';
+
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'goBus';
+          input.value = val;
+          if (existingGoBus === val) {
+            input.checked = true;
+          }
+
+          const span = document.createElement('span');
+          span.className = 'reply-consent-label';
+          span.textContent = val;
+
+          optLabel.appendChild(input);
+          optLabel.appendChild(span);
+          goOptions.appendChild(optLabel);
+        });
+
+        goWrapper.appendChild(goOptions);
+        consentSection.appendChild(goWrapper);
+
+        // 回程
+        const backWrapper = document.createElement('div');
+        backWrapper.className = 'reply-bus-field';
+
+        const backLabel = document.createElement('div');
+        backLabel.className = 'reply-bus-label';
+        backLabel.textContent = '回程搭乘遊覽車';
+        backWrapper.appendChild(backLabel);
+
+        const backOptions = document.createElement('div');
+        backOptions.className = 'reply-consent-options';
+
+        ['是', '否'].forEach(val => {
+          const optLabel = document.createElement('label');
+          optLabel.className = 'reply-consent-option';
+
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'backBus';
+          input.value = val;
+          if (existingBackBus === val) {
+            input.checked = true;
+          }
+
+          const span = document.createElement('span');
+          span.className = 'reply-consent-label';
+          span.textContent = val;
+
+          optLabel.appendChild(input);
+          optLabel.appendChild(span);
+          backOptions.appendChild(optLabel);
+        });
+
+        backWrapper.appendChild(backOptions);
+        consentSection.appendChild(backWrapper);
       }
 
-      const checkboxLabel = document.createElement('label');
-      checkboxLabel.appendChild(input);
-      const text = field.checkboxLabel || field.label || '';
-      if (text) {
-        checkboxLabel.appendChild(document.createTextNode(' ' + text));
-      }
-      wrapper.innerHTML = '';
-      wrapper.appendChild(checkboxLabel);
-    } else if (field.type === 'textarea') {
-      const textarea = document.createElement('textarea');
-      textarea.name = field.id;
-      textarea.placeholder = field.placeholder || '';
-      textarea.value = (existingAnswer && existingAnswer[field.id]) || '';
-      wrapper.appendChild(textarea);
-    } else if (field.type === 'text') {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = field.id;
-      input.placeholder = field.placeholder || '';
-      input.value = (existingAnswer && existingAnswer[field.id]) || '';
-      wrapper.appendChild(input);
-    } else if (field.type === 'signature') {
-      const existingDataUrl = (existingAnswer && existingAnswer[field.id]) || '';
+      // 備註（限 50 字）
+      const noteWrapper = document.createElement('div');
+      noteWrapper.className = 'reply-note-wrapper';
+
+      const noteLabel = document.createElement('label');
+      noteLabel.className = 'reply-note-label';
+      noteLabel.textContent = '家長備註（限 50 字內）';
+
+      const noteTextarea = document.createElement('textarea');
+      noteTextarea.name = 'parentNote';
+      noteTextarea.className = 'reply-note-textarea';
+      noteTextarea.rows = 2;
+      noteTextarea.maxLength = 50;
+      noteTextarea.placeholder = '如有補充說明，請簡短填寫。';
+      noteTextarea.value = (existingAnswer && existingAnswer.parentNote) || '';
+
+      noteWrapper.appendChild(noteLabel);
+      noteWrapper.appendChild(noteTextarea);
+      consentSection.appendChild(noteWrapper);
+
+      // 家長簽名
+      const sigWrapper = document.createElement('div');
+      sigWrapper.className = 'reply-signature-field';
+
+      const sigLabel = document.createElement('div');
+      sigLabel.textContent = '家長簽名';
+      sigWrapper.appendChild(sigLabel);
 
       const container = document.createElement('div');
       container.className = 'signature-container';
 
+      const existingSig = existingAnswer && (existingAnswer.parentSignature || existingAnswer.signature || '');
+
       const openBtn = document.createElement('button');
       openBtn.type = 'button';
       openBtn.className = 'btn secondary small';
-      openBtn.textContent = existingDataUrl ? '重新簽名' : '點擊簽名';
+      openBtn.textContent = existingSig ? '重新簽名' : '點擊簽名';
 
       const preview = document.createElement('div');
       preview.className = 'signature-preview';
@@ -704,7 +1005,8 @@ function buildEventForm(def, existingAnswer, ev) {
 
       container.appendChild(openBtn);
       container.appendChild(preview);
-      wrapper.appendChild(container);
+      sigWrapper.appendChild(container);
+      consentSection.appendChild(sigWrapper);
 
       const modal = document.createElement('div');
       modal.className = 'signature-modal';
@@ -748,7 +1050,7 @@ function buildEventForm(def, existingAnswer, ev) {
       const pad = initSignaturePad(canvas);
 
       const state = {
-        value: existingDataUrl || '',
+        value: existingSig || '',
         pad,
         modal,
         modalContent,
@@ -757,7 +1059,7 @@ function buildEventForm(def, existingAnswer, ev) {
         preview,
         img
       };
-      signatureStates[field.id] = state;
+      signatureStates['consentSignature'] = state;
 
       function updatePreview() {
         if (state.value) {
@@ -811,338 +1113,147 @@ function buildEventForm(def, existingAnswer, ev) {
         state.pad.clear();
       });
 
+      form.appendChild(consentSection);
     } else {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = field.id;
-      input.value = (existingAnswer && existingAnswer[field.id]) || '';
-      wrapper.appendChild(input);
+      // 非同意書：保留家長備註欄位
+      const noteWrapper = document.createElement('div');
+      noteWrapper.className = 'form-field';
+
+      const noteLabel = document.createElement('label');
+      noteLabel.textContent = '家長備註（限 50 字內）';
+
+      const noteTextarea = document.createElement('textarea');
+      noteTextarea.name = 'parentNote';
+      noteTextarea.rows = 2;
+      noteTextarea.maxLength = 50;
+      noteTextarea.placeholder = '如有補充說明，請簡短填寫。';
+      noteTextarea.value = (existingAnswer && existingAnswer.parentNote) || '';
+
+      noteWrapper.appendChild(noteLabel);
+      noteWrapper.appendChild(noteTextarea);
+      form.appendChild(noteWrapper);
     }
 
-    form.appendChild(wrapper);
-  });
+    const btnRow = document.createElement('div');
+    btnRow.style.marginTop = '0.8rem';
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    submitBtn.className = 'btn primary full-width';
+    submitBtn.textContent = '送出回條';
+    btnRow.appendChild(submitBtn);
+    form.appendChild(btnRow);
 
-  // === 同意書專用下半部：是否同意 + 同意/不同意 + 50字備註 + 家長簽名 ===
-  if (isConsent) {
-    const consentSection = document.createElement('section');
-    consentSection.className = 'reply-section';
-
-    const questionP = document.createElement('p');
-    questionP.className = 'reply-question';
-
-    const session = getStudentSession();
-    const studentName = session && session.name ? session.name : '';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'reply-question-name';
-    nameSpan.textContent = studentName;
-
-    questionP.append('是否同意「');
-    questionP.appendChild(nameSpan);
-    questionP.append('」出席？');
-    consentSection.appendChild(questionP);
-
-    const optionsDiv = document.createElement('div');
-    optionsDiv.className = 'reply-consent-options';
-
-    const currentConsent = existingAnswer && existingAnswer.consentChoice;
-
-    ['同意', '不同意'].forEach(val => {
-      const optLabel = document.createElement('label');
-      optLabel.className = 'reply-consent-option';
-
-      const input = document.createElement('input');
-      input.type = 'radio';
-      input.name = 'consentChoice';
-      input.value = val;
-      if (currentConsent === val) {
-        input.checked = true;
-      }
-
-      const span = document.createElement('span');
-      span.className = 'reply-consent-label';
-      span.textContent = val;
-
-      optLabel.appendChild(input);
-      optLabel.appendChild(span);
-      optionsDiv.appendChild(optLabel);
-    });
-
-    consentSection.appendChild(optionsDiv);
-
-    const noteWrapper = document.createElement('div');
-    noteWrapper.className = 'reply-note-wrapper';
-
-    const noteLabel = document.createElement('label');
-    noteLabel.className = 'reply-note-label';
-    noteLabel.textContent = '家長備註（限 50 字內）';
-
-    const noteTextarea = document.createElement('textarea');
-    noteTextarea.name = 'parentNote';
-    noteTextarea.className = 'reply-note-textarea';
-    noteTextarea.rows = 2;
-    noteTextarea.maxLength = 50;
-    noteTextarea.placeholder = '如有補充說明，請簡短填寫。';
-    noteTextarea.value = (existingAnswer && existingAnswer.parentNote) || '';
-
-    noteWrapper.appendChild(noteLabel);
-    noteWrapper.appendChild(noteTextarea);
-    consentSection.appendChild(noteWrapper);
-
-    const sigWrapper = document.createElement('div');
-    sigWrapper.className = 'reply-signature-field';
-
-    const sigLabel = document.createElement('div');
-    sigLabel.textContent = '家長簽名';
-    sigWrapper.appendChild(sigLabel);
-
-    const container = document.createElement('div');
-    container.className = 'signature-container';
-
-    const existingSig = existingAnswer && (existingAnswer.parentSignature || existingAnswer.signature || '');
-
-    const openBtn = document.createElement('button');
-    openBtn.type = 'button';
-    openBtn.className = 'btn secondary small';
-    openBtn.textContent = existingSig ? '重新簽名' : '點擊簽名';
-
-    const preview = document.createElement('div');
-    preview.className = 'signature-preview';
-    const img = document.createElement('img');
-    preview.appendChild(img);
-
-    container.appendChild(openBtn);
-    container.appendChild(preview);
-    sigWrapper.appendChild(container);
-    consentSection.appendChild(sigWrapper);
-
-    const modal = document.createElement('div');
-    modal.className = 'signature-modal';
-
-    const modalContent = document.createElement('div');
-    modalContent.className = 'signature-modal-content';
-
-    const canvasWrapper = document.createElement('div');
-    canvasWrapper.className = 'signature-canvas-wrapper';
-
-    const canvas = document.createElement('canvas');
-    canvas.className = 'signature-canvas';
-    canvasWrapper.appendChild(canvas);
-    modalContent.appendChild(canvasWrapper);
-
-    const footer = document.createElement('div');
-    footer.className = 'signature-modal-footer';
-
-    const resetBtn = document.createElement('button');
-    resetBtn.type = 'button';
-    resetBtn.className = 'btn secondary small';
-    resetBtn.textContent = '↻';
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'btn secondary small';
-    cancelBtn.textContent = 'X';
-
-    const okBtn = document.createElement('button');
-    okBtn.type = 'button';
-    okBtn.className = 'btn primary small';
-    okBtn.textContent = 'O';
-
-    footer.appendChild(resetBtn);
-    footer.appendChild(cancelBtn);
-    footer.appendChild(okBtn);
-    modalContent.appendChild(footer);
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-
-    const pad = initSignaturePad(canvas);
-
-    const state = {
-      value: existingSig || '',
-      pad,
-      modal,
-      modalContent,
-      canvasWrapper,
-      openBtn,
-      preview,
-      img
-    };
-    signatureStates['consentSignature'] = state;
-
-    function updatePreview() {
-      if (state.value) {
-        state.img.src = state.value;
-        state.preview.classList.remove('hidden');
-        state.openBtn.textContent = '重新簽名';
-      } else {
-        state.img.src = '';
-        state.preview.classList.add('hidden');
-        state.openBtn.textContent = '點擊簽名';
-      }
-      state.openBtn.disabled = false;
-    }
-
-    function openModal() {
-      state.modal.classList.add('active');
-      state.openBtn.disabled = true;
-      state.pad.clear();
-      requestAnimationFrame(() => {
-        state.pad.resize();
-      });
-    }
-
-    function closeModal() {
-      state.modal.classList.remove('active');
-      state.openBtn.disabled = false;
-    }
-
-    updatePreview();
-
-    openBtn.addEventListener('click', () => {
-      openModal();
-    });
-
-    cancelBtn.addEventListener('click', () => {
-      closeModal();
-    });
-
-    okBtn.addEventListener('click', () => {
-      const dataUrl = state.pad.getDataURL();
-      if (!dataUrl) {
-        showToast('請先簽名');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const session = getStudentSession();
+      if (!session) {
+        showToast('請先登入');
         return;
       }
-      state.value = dataUrl;
-      updatePreview();
-      closeModal();
+
+      const answerObj = {};
+      (def.fields || []).forEach(field => {
+        if (field.type === 'radio') {
+          const checked = form.querySelector(`input[name="${field.id}"]:checked`);
+          answerObj[field.id] = checked ? checked.value : '';
+        } else if (field.type === 'checkbox') {
+          const el = form.querySelector(`input[name="${field.id}"]`);
+          answerObj[field.id] = !!(el && el.checked);
+        } else if (field.type === 'textarea' || field.type === 'text') {
+          const el = form.querySelector(`[name="${field.id}"]`);
+          answerObj[field.id] = el ? el.value : '';
+        } else if (field.type === 'signature') {
+          const state = signatureStates[field.id];
+          answerObj[field.id] = state ? state.value : '';
+        }
+      });
+
+      const noteEl = form.querySelector('textarea[name="parentNote"]');
+      if (noteEl) {
+        let txt = noteEl.value || '';
+        if (txt.length > 50) {
+          txt = txt.slice(0, 50);
+        }
+        answerObj.parentNote = txt;
+      }
+
+      if (isConsent) {
+        const consentChecked = form.querySelector('input[name="consentChoice"]:checked');
+        if (!consentChecked) {
+          eventStatusMessageEl.textContent = '請選擇「同意」或「不同意」。';
+          return;
+        }
+        answerObj.consentChoice = consentChecked.value;
+
+        // ✅ 若是這次遊覽車活動，兩個欄位必填
+        if (isBusTripConsent) {
+          const goChecked = form.querySelector('input[name="goBus"]:checked');
+          const backChecked = form.querySelector('input[name="backBus"]:checked');
+
+          if (!goChecked) {
+            eventStatusMessageEl.textContent = '請選擇「去程是否搭乘遊覽車」。';
+            return;
+          }
+          if (!backChecked) {
+            eventStatusMessageEl.textContent = '請選擇「回程是否搭乘遊覽車」。';
+            return;
+          }
+
+          answerObj.goBus = goChecked.value;   // "是" or "否"
+          answerObj.backBus = backChecked.value;
+        }
+
+        const sigState = signatureStates['consentSignature'];
+        if (!sigState || !sigState.value) {
+          eventStatusMessageEl.textContent = '請完成家長簽名。';
+          return;
+        }
+        answerObj.parentSignature = sigState.value;
+      }
+
+      const answerJsonString = JSON.stringify(answerObj || {});
+      if (answerJsonString.length > 48000) {
+        eventStatusMessageEl.textContent = '簽名圖檔過大，請簽得稍微小一點或不要塗滿整個簽名區再試一次。';
+        console.warn('answerJson too long:', answerJsonString.length);
+        return;
+      }
+
+      if (typeof setButtonLoading === 'function') {
+        setButtonLoading(submitBtn, true);
+      }
+
+      try {
+        const res = await postReply({
+          eventId: ev.eventId,
+          class: session.class,
+          name: session.name,
+          answer: answerObj
+        });
+        if (!res.ok) {
+          if (res.error === 'DEADLINE_PASSED') {
+            eventStatusMessageEl.textContent = '已超過回覆截止時間，無法再送出或修改。';
+          } else {
+            eventStatusMessageEl.textContent = '送出失敗：' + (res.error || '未知錯誤');
+          }
+          return;
+        }
+        eventStatusMessageEl.textContent = '已成功送出回條（時間：' + res.ts + '）';
+        showToast('送出成功');
+        await refreshEventsAndLatest();
+      } catch (err) {
+        console.error(err);
+        eventStatusMessageEl.textContent = '送出失敗（網路或系統錯誤）';
+      } finally {
+        if (typeof setButtonLoading === 'function') {
+          setButtonLoading(submitBtn, false);
+        }
+      }
     });
 
-    resetBtn.addEventListener('click', () => {
-      state.pad.clear();
-    });
-
-    form.appendChild(consentSection);
-  } else {
-    const noteWrapper = document.createElement('div');
-    noteWrapper.className = 'form-field';
-
-    const noteLabel = document.createElement('label');
-    noteLabel.textContent = '家長備註（限 50 字內）';
-
-    const noteTextarea = document.createElement('textarea');
-    noteTextarea.name = 'parentNote';
-    noteTextarea.rows = 2;
-    noteTextarea.maxLength = 50;
-    noteTextarea.placeholder = '如有補充說明，請簡短填寫。';
-    noteTextarea.value = (existingAnswer && existingAnswer.parentNote) || '';
-
-    noteWrapper.appendChild(noteLabel);
-    noteWrapper.appendChild(noteTextarea);
-    form.appendChild(noteWrapper);
+    eventFormContainer.appendChild(form);
   }
 
-  const btnRow = document.createElement('div');
-  btnRow.style.marginTop = '0.8rem';
-  const submitBtn = document.createElement('button');
-  submitBtn.type = 'submit';
-  submitBtn.className = 'btn primary full-width';
-  submitBtn.textContent = '送出回條';
-  btnRow.appendChild(submitBtn);
-  form.appendChild(btnRow);
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const session = getStudentSession();
-    if (!session) {
-      showToast('請先登入');
-      return;
-    }
-
-    const answerObj = {};
-    (def.fields || []).forEach(field => {
-      if (field.type === 'radio') {
-        const checked = form.querySelector(`input[name="${field.id}"]:checked`);
-        answerObj[field.id] = checked ? checked.value : '';
-      } else if (field.type === 'checkbox') {
-        const el = form.querySelector(`input[name="${field.id}"]`);
-        answerObj[field.id] = !!(el && el.checked);
-      } else if (field.type === 'textarea' || field.type === 'text') {
-        const el = form.querySelector(`[name="${field.id}"]`);
-        answerObj[field.id] = el ? el.value : '';
-      } else if (field.type === 'signature') {
-        const state = signatureStates[field.id];
-        answerObj[field.id] = state ? state.value : '';
-      }
-    });
-
-    const noteEl = form.querySelector('textarea[name="parentNote"]');
-    if (noteEl) {
-      let txt = noteEl.value || '';
-      if (txt.length > 50) {
-        txt = txt.slice(0, 50);
-      }
-      answerObj.parentNote = txt;
-    }
-
-    if (isConsent) {
-      const consentChecked = form.querySelector('input[name="consentChoice"]:checked');
-      if (!consentChecked) {
-        eventStatusMessageEl.textContent = '請選擇「同意」或「不同意」。';
-        return;
-      }
-      answerObj.consentChoice = consentChecked.value;
-
-      const sigState = signatureStates['consentSignature'];
-      if (!sigState || !sigState.value) {
-        eventStatusMessageEl.textContent = '請完成家長簽名。';
-        return;
-      }
-      answerObj.parentSignature = sigState.value;
-    }
-
-    const answerJsonString = JSON.stringify(answerObj || {});
-    if (answerJsonString.length > 48000) {
-      eventStatusMessageEl.textContent = '簽名圖檔過大，請簽得稍微小一點或不要塗滿整個簽名區再試一次。';
-      console.warn('answerJson too long:', answerJsonString.length);
-      return;
-    }
-
-    if (typeof setButtonLoading === 'function') {
-      setButtonLoading(submitBtn, true);
-    }
-
-    try {
-      const res = await postReply({
-        eventId: ev.eventId,
-        class: session.class,
-        name: session.name,
-        answer: answerObj
-      });
-      if (!res.ok) {
-        if (res.error === 'DEADLINE_PASSED') {
-          eventStatusMessageEl.textContent = '已超過回覆截止時間，無法再送出或修改。';
-        } else {
-          eventStatusMessageEl.textContent = '送出失敗：' + (res.error || '未知錯誤');
-        }
-        return;
-      }
-      eventStatusMessageEl.textContent = '已成功送出回條（時間：' + res.ts + '）';
-      showToast('送出成功');
-      await refreshEventsAndLatest();
-    } catch (err) {
-      console.error(err);
-      eventStatusMessageEl.textContent = '送出失敗（網路或系統錯誤）';
-    } finally {
-      if (typeof setButtonLoading === 'function') {
-        setButtonLoading(submitBtn, false);
-      }
-    }
-  });
-
-  eventFormContainer.appendChild(form);
-}
-
-// ---- 頁面載入時  // ---- 頁面載入時：依照 session 狀態決定登入 / 未登入 ----
+  // ---- 頁面載入時：依照 session 狀態決定登入 / 未登入 ----
   const existingSession = getStudentSession();
   if (existingSession && existingSession.class && existingSession.name) {
     // ✅ 已登入：保持登入狀態（不清除 session / cache）

@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventDetailUnrepliedSection = document.getElementById('event-detail-unreplied');
   const eventDetailUnrepliedTbody = document.getElementById('event-detail-unreplied-tbody');
 
+  // 排排站大作戰：排序/篩選
+  const detailSortPills = document.getElementById('detail-sort-pills');
+  const detailClassFilters = document.getElementById('detail-class-filters');
+
   // 簽名顯示區
   const signatureViewer = document.getElementById('signature-viewer');
   const signatureViewerInfo = document.getElementById('signature-viewer-info');
@@ -31,6 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 目前這一場活動的詳細資料（含 replied / notReplied + 是否有搭車欄位）
   let currentEventDetailData = null;
+
+  // 排排站大作戰：UI 狀態（跨活動保留）
+  const detailViewState = {
+    classFilter: 'ALL',
+    sortMode: 'instrument',
+  };
 
   function renderLoggedIn() {
     setHidden(loginSection, true);
@@ -112,6 +122,175 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  
+  // ===== 排排站大作戰：工具函式 =====
+  function classOrderKey(cls) {
+    const s = (cls || '').trim();
+    if (!s) return [999, 999, s];
+    const gradeMap = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+    const secMap = { '甲':1,'乙':2,'丙':3,'丁':4,'戊':5,'己':6,'庚':7,'辛':8,'壬':9,'癸':10 };
+    const gChar = s[0];
+    const secChar = s[1] || '';
+    const g = gradeMap[gChar] ?? 999;
+    const sec = secMap[secChar] ?? 999;
+    return [g, sec, s];
+  }
+
+  function safeParseAnswer(answer) {
+    try {
+      if (!answer) return {};
+      if (typeof answer === 'object') return answer;
+      return JSON.parse(String(answer));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function parseReplyTime(row) {
+    // 盡量相容：row 欄位、或 answer 內欄位
+    const direct = row.lastReplyTs ?? row.replyAt ?? row.updatedAt ?? row.createdAt ?? row.timestamp ?? row.time ?? null;
+    const candidates = [];
+    if (direct != null) candidates.push(direct);
+
+    const ans = safeParseAnswer(row.answer);
+    const fromAns = ans.replyAt ?? ans.submittedAt ?? ans.updatedAt ?? ans.createdAt ?? ans.timestamp ?? ans.time ?? ans.submitTime ?? null;
+    if (fromAns != null) candidates.push(fromAns);
+
+    for (const v of candidates) {
+      // number: seconds or ms
+      if (typeof v === 'number' && isFinite(v)) {
+        const ms = v < 2_000_000_000 ? v * 1000 : v;
+        const d = new Date(ms);
+        if (!isNaN(d.getTime())) return d;
+      }
+      // string
+      if (typeof v === 'string') {
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) return d;
+        // numeric string
+        const n = Number(v);
+        if (isFinite(n)) {
+          const ms = n < 2_000_000_000 ? n * 1000 : n;
+          const d2 = new Date(ms);
+          if (!isNaN(d2.getTime())) return d2;
+        }
+      }
+    }
+    return null;
+  }
+
+  function buildClassFilterButtons(detailData) {
+    if (!detailClassFilters) return;
+
+    const replied = (detailData && detailData.replied) || [];
+    const notReplied = (detailData && detailData.notReplied) || [];
+    const classes = new Set();
+
+    [...replied, ...notReplied].forEach(r => {
+      const c = (r.class != null ? String(r.class) : '').trim();
+      if (c) classes.add(c);
+    });
+
+    // 你指定的固定順序（第一行按鈕）
+    const preferred = ['八甲', '八乙', '七甲', '七乙'];
+
+    // 若活動內有其他班級，追加在後面（依班級順序）
+    const extra = Array.from(classes).filter(c => !preferred.includes(c));
+    extra.sort((a, b) => {
+      const ka = classOrderKey(a);
+      const kb = classOrderKey(b);
+      if (ka[0] !== kb[0]) return ka[0] - kb[0];
+      if (ka[1] !== kb[1]) return ka[1] - kb[1];
+      return ka[2].localeCompare(kb[2], 'zh-Hant');
+    });
+
+    const classList = preferred.concat(extra);
+
+    detailClassFilters.innerHTML = '';
+
+    const makeBtn = (label, value) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pill-btn';
+      b.textContent = label;
+      b.dataset.value = value;
+      b.addEventListener('click', () => {
+        detailViewState.classFilter = value;
+        // active style
+        [...detailClassFilters.querySelectorAll('.pill-btn')].forEach(x => x.classList.remove('is-active'));
+        b.classList.add('is-active');
+        renderEventDetailTables();
+      });
+      return b;
+    };
+
+    const allBtn = makeBtn('全部', 'ALL');
+    if (detailViewState.classFilter === 'ALL') allBtn.classList.add('is-active');
+    detailClassFilters.appendChild(allBtn);
+
+    classList.forEach(cls => {
+      // 固定四班即使該活動沒出現也要顯示；若沒有出現則 disabled
+      const exists = classes.has(cls);
+      const btn = makeBtn(cls, cls);
+      if (!exists) {
+        btn.disabled = true;
+        btn.style.opacity = '0.45';
+        btn.style.cursor = 'not-allowed';
+      }
+      if (detailViewState.classFilter === cls) btn.classList.add('is-active');
+      detailClassFilters.appendChild(btn);
+    });
+
+    // 若目前選到的班級在本活動不存在，回到 ALL
+    if (detailViewState.classFilter !== 'ALL' && !classes.has(detailViewState.classFilter)) {
+      detailViewState.classFilter = 'ALL';
+      [...detailClassFilters.querySelectorAll('.pill-btn')].forEach(x => x.classList.remove('is-active'));
+      allBtn.classList.add('is-active');
+    }
+  }
+
+  function buildSortPills() {
+    if (!detailSortPills) return;
+
+    detailSortPills.innerHTML = '';
+
+    const items = [
+      { label: '依樂器', value: 'instrument' },
+      { label: '新到舊', value: 'time_desc' },
+      { label: '舊到新', value: 'time_asc' },
+    ];
+
+    const makeBtn = (label, value) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pill-btn pill-green';
+      b.textContent = label;
+      b.dataset.value = value;
+      b.addEventListener('click', () => {
+        detailViewState.sortMode = value;
+        [...detailSortPills.querySelectorAll('.pill-btn')].forEach(x => x.classList.remove('is-active'));
+        b.classList.add('is-active');
+        renderEventDetailTables();
+      });
+      return b;
+    };
+
+    items.forEach(it => {
+      const btn = makeBtn(it.label, it.value);
+      if ((detailViewState.sortMode || 'instrument') === it.value) btn.classList.add('is-active');
+      detailSortPills.appendChild(btn);
+    });
+  }
+
+  function syncDetailControlsUI() {
+    // 班級 pills 是動態渲染時會處理 active；排序 pills 在 buildSortPills 處理 active
+    buildSortPills();
+  }
+
+
+
+// 依照目前模式（checkbox）繪製「已回覆 / 未回覆」兩個區塊
+  
   // 依照目前模式（checkbox）繪製「已回覆 / 未回覆」兩個區塊
   function renderEventDetailTables() {
     if (!currentEventDetailData) return;
@@ -121,12 +300,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasBus = !!currentEventDetailData.hasBusFields; // 是否有 goBus/backBus 欄位
     const showUnreplied = detailShowUnrepliedToggle && detailShowUnrepliedToggle.checked;
 
+    // 目前展開中的學生 key（一次只允許展開一人）
+    // key: `${class}__${name}`
+    if (!renderEventDetailTables._expandedKey) renderEventDetailTables._expandedKey = null;
+
     // 調整表頭去程/回程欄位顯示
     const detailTable = eventDetailTbody ? eventDetailTbody.closest('table') : null;
     if (detailTable) {
       const headerCells = detailTable.querySelectorAll('thead th');
-      if (headerCells.length >= 7) {
-        // index: 0姓名,1班級,2樂器,3結果,4去程,5回程,6簽名
+      // index: 0姓名,1班級,2樂器,3結果,4去程,5回程,6簽名,7備註
+      if (headerCells.length >= 8) {
         if (hasBus) {
           headerCells[4].style.display = '';
           headerCells[5].style.display = '';
@@ -137,45 +320,285 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    const COLS = hasBus ? 8 : 6;
+
+    function normalizeNote(raw) {
+      if (raw == null) return '';
+      const s = String(raw);
+      if (!s.trim()) return '';
+      return s;
+    }
+
+    function extractFromAnswer(row) {
+      let resultText = '';
+      let signatureUrl = '';
+      let goBus = '';
+      let backBus = '';
+      let noteText = '';
+
+      try {
+        const ans = safeParseAnswer(row.answer);
+        resultText =
+          ans.result ||
+          ans.reply ||
+          ans.choice ||
+          ans.status ||
+          ans.attend ||
+          ans.consentChoice ||
+          '';
+
+        signatureUrl =
+          ans.parentSignature ||
+          ans.signatureDataUrl ||
+          ans.signature ||
+          ans.sign ||
+          '';
+
+        goBus = ans.goBus || '';
+        backBus = ans.backBus || '';
+
+        // 備註欄位（多 key 相容）
+        noteText = normalizeNote(
+          ans.parentNote ??   // ✅ 加這行
+          ans.note ??
+          ans.remark ??
+          ans.memo ??
+          ans.comment ??
+          ans.message ??
+          ans.parentNote ??
+          ans.parentMemo ??
+          ''
+        );
+      } catch (e) {
+        console.warn('解析 answer 失敗', row.answer, e);
+      }
+
+      return { resultText, signatureUrl, goBus, backBus, noteText };
+    }
+
+    function rowToView(row) {
+      const cls = (row.class != null ? String(row.class) : '').trim();
+      const name = (row.name != null ? String(row.name) : '').trim();
+      const instrument = (row.instrument != null ? String(row.instrument) : '').trim();
+
+      const { resultText, signatureUrl, goBus, backBus, noteText } = extractFromAnswer(row);
+      const replyTime = parseReplyTime(row);
+
+      return { row, cls, name, instrument, resultText, signatureUrl, goBus, backBus, noteText, replyTime };
+    }
+
+    function applyFiltersAndSort(list) {
+      let out = list.slice();
+
+      // 班級篩選
+      if (detailViewState.classFilter && detailViewState.classFilter !== 'ALL') {
+        out = out.filter(v => v.cls === detailViewState.classFilter);
+      }
+
+      // 排序
+      const mode = detailViewState.sortMode || 'class';
+      if (mode === 'instrument') {
+        out.sort((a, b) => {
+          const ia = a.instrument || '';
+          const ib = b.instrument || '';
+          const c = ia.localeCompare(ib, 'zh-Hant');
+          if (c !== 0) return c;
+          // 次排序：班級 → 姓名
+          const ca = classOrderKey(a.cls);
+          const cb = classOrderKey(b.cls);
+          if (ca[0] !== cb[0]) return ca[0] - cb[0];
+          if (ca[1] !== cb[1]) return ca[1] - cb[1];
+          return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+        });
+      } else if (mode === 'time_asc' || mode === 'time_desc') {
+        const dir = mode === 'time_asc' ? 1 : -1;
+        out.sort((a, b) => {
+          const ta = a.replyTime ? a.replyTime.getTime() : null;
+          const tb = b.replyTime ? b.replyTime.getTime() : null;
+          if (ta == null && tb == null) return 0;
+          if (ta == null) return 1;
+          if (tb == null) return -1;
+          if (ta === tb) return 0;
+          return (ta < tb ? -1 : 1) * dir;
+        });
+      } else {
+        // class
+        out.sort((a, b) => {
+          const ca = classOrderKey(a.cls);
+          const cb = classOrderKey(b.cls);
+          if (ca[0] !== cb[0]) return ca[0] - cb[0];
+          if (ca[1] !== cb[1]) return ca[1] - cb[1];
+          // 次排序：姓名
+          return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+        });
+      }
+
+      return out;
+    }
+
+    function collapseCurrentExpanded() {
+      const key = renderEventDetailTables._expandedKey;
+      if (!key) return;
+
+      // 找到目前的 anchor row
+      const anchor = eventDetailTbody.querySelector(`tr[data-expand-key="${cssEscape(key)}"]`);
+      if (anchor) {
+        anchor.classList.remove('detail-expanded-anchor');
+        // buttons active
+        anchor.querySelectorAll('button.is-active').forEach(b => b.classList.remove('is-active'));
+      }
+
+      // 移除 expand row
+      const expandRow = eventDetailTbody.querySelector(`tr.detail-expand-row[data-expand-key="${cssEscape(key)}"]`);
+      if (expandRow) expandRow.remove();
+
+      renderEventDetailTables._expandedKey = null;
+    }
+
+    function ensureExpandRow(anchorTr, key) {
+      // expand row already exists?
+      let expandRow = eventDetailTbody.querySelector(`tr.detail-expand-row[data-expand-key="${cssEscape(key)}"]`);
+      if (!expandRow) {
+        expandRow = document.createElement('tr');
+        expandRow.className = 'detail-expand-row';
+        expandRow.dataset.expandKey = key;
+
+        const td = document.createElement('td');
+        td.colSpan = COLS;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'detail-expand-wrap';
+
+        // signature panel
+        const sigPanel = document.createElement('div');
+        sigPanel.className = 'detail-panel';
+        sigPanel.dataset.panel = 'signature';
+        sigPanel.classList.add('hidden');
+        sigPanel.innerHTML = `
+          <div class="detail-panel-title">簽名</div>
+          <img class="detail-signature-img" alt="家長簽名" />
+        `;
+
+        // note panel
+        const notePanel = document.createElement('div');
+        notePanel.className = 'detail-panel';
+        notePanel.dataset.panel = 'note';
+        notePanel.classList.add('hidden');
+        notePanel.innerHTML = `
+          <div class="detail-panel-title">備註</div>
+          <div class="detail-note-text"></div>
+        `;
+
+        wrap.appendChild(sigPanel);
+        wrap.appendChild(notePanel);
+        td.appendChild(wrap);
+        expandRow.appendChild(td);
+
+        // insert after anchor
+        if (anchorTr.nextSibling) eventDetailTbody.insertBefore(expandRow, anchorTr.nextSibling);
+        else eventDetailTbody.appendChild(expandRow);
+      }
+      return expandRow;
+    }
+
+    function setPanelVisible(expandRow, panelName, visible) {
+      const panel = expandRow.querySelector(`.detail-panel[data-panel="${panelName}"]`);
+      if (!panel) return;
+      if (visible) panel.classList.remove('hidden');
+      else panel.classList.add('hidden');
+
+      // 如果兩個都 hidden，整個 expand row 就移除
+      const anyVisible = [...expandRow.querySelectorAll('.detail-panel')].some(p => !p.classList.contains('hidden'));
+      if (!anyVisible) {
+        const key = expandRow.dataset.expandKey;
+        const anchor = eventDetailTbody.querySelector(`tr[data-expand-key="${cssEscape(key)}"]`);
+        if (anchor) {
+          anchor.classList.remove('detail-expanded-anchor');
+          anchor.querySelectorAll('button.is-active').forEach(b => b.classList.remove('is-active'));
+        }
+        expandRow.remove();
+        if (renderEventDetailTables._expandedKey === key) renderEventDetailTables._expandedKey = null;
+      }
+    }
+
+    function cssEscape(str) {
+      // minimal escape for attribute selector
+      return String(str).replace(/["\\]/g, '\\$&');
+    }
+
+    function handleToggle(key, anchorTr, type, payload) {
+      // 若點的是另一個人：先收起舊的，再展開新的
+      if (renderEventDetailTables._expandedKey && renderEventDetailTables._expandedKey !== key) {
+        collapseCurrentExpanded();
+      }
+
+      // 設定目前展開 key
+      if (!renderEventDetailTables._expandedKey) renderEventDetailTables._expandedKey = key;
+
+      anchorTr.classList.add('detail-expanded-anchor');
+
+      const expandRow = ensureExpandRow(anchorTr, key);
+
+      if (type === 'signature') {
+        const btn = anchorTr.querySelector('button[data-action="sig"]');
+        const panel = expandRow.querySelector('.detail-panel[data-panel="signature"]');
+        const img = panel ? panel.querySelector('img.detail-signature-img') : null;
+
+        const isOpen = panel && !panel.classList.contains('hidden');
+        if (isOpen) {
+          setPanelVisible(expandRow, 'signature', false);
+          if (btn) btn.classList.remove('is-active');
+        } else {
+          if (img) img.src = payload.signatureUrl || '';
+          setPanelVisible(expandRow, 'signature', true);
+          if (btn) btn.classList.add('is-active');
+        }
+      }
+
+      if (type === 'note') {
+        const btn = anchorTr.querySelector('button[data-action="note"]');
+        const panel = expandRow.querySelector('.detail-panel[data-panel="note"]');
+        const box = panel ? panel.querySelector('.detail-note-text') : null;
+
+        const isOpen = panel && !panel.classList.contains('hidden');
+        if (isOpen) {
+          setPanelVisible(expandRow, 'note', false);
+          if (btn) btn.classList.remove('is-active');
+        } else {
+          if (box) box.textContent = payload.noteText || '';
+          setPanelVisible(expandRow, 'note', true);
+          if (btn) btn.classList.add('is-active');
+        }
+      }
+    }
+
     // ===== 上半部：已回覆名單 =====
     if (!replied.length) {
       eventDetailTbody.innerHTML =
-        `<tr><td colspan="${hasBus ? 7 : 5}" class="muted">目前尚無回覆。</td></tr>`;
+        `<tr><td colspan="${COLS}" class="muted">目前尚無回覆。</td></tr>`;
     } else {
       eventDetailTbody.innerHTML = '';
-      replied.forEach(row => {
+      renderEventDetailTables._expandedKey = null;
+
+      const viewRows = applyFiltersAndSort(replied.map(rowToView));
+
+      if (!viewRows.length) {
+        eventDetailTbody.innerHTML = `<tr><td colspan="${COLS}" class="muted">沒有符合篩選條件的資料。</td></tr>`;
+        return;
+      }
+
+      viewRows.forEach(v => {
+        const row = v.row;
         const tr = document.createElement('tr');
 
-        const cls = (row.class != null ? String(row.class) : '');
-        const name = (row.name != null ? String(row.name) : '');
-        const instrument = (row.instrument != null ? String(row.instrument) : '');
+        const cls = v.cls;
+        const name = v.name;
+        const instrument = v.instrument;
 
-        let resultText = '';
-        let signatureUrl = '';
-        let goBus = '';
-        let backBus = '';
+        const { resultText, signatureUrl, goBus, backBus, noteText } = v;
 
-        try {
-          const ans = row.answer ? JSON.parse(row.answer) : {};
-          resultText =
-            ans.result ||
-            ans.reply ||
-            ans.choice ||
-            ans.status ||
-            ans.attend ||
-            ans.consentChoice ||
-            '';
-          signatureUrl =
-            ans.parentSignature ||
-            ans.signatureDataUrl ||
-            ans.signature ||
-            ans.sign ||
-            '';
-          goBus = ans.goBus || '';
-          backBus = ans.backBus || '';
-        } catch (e) {
-          console.warn('解析 answer 失敗', row.answer, e);
-        }
+        const key = `${cls}__${name}`;
+        tr.dataset.expandKey = key;
 
         const tdName = document.createElement('td');
         tdName.textContent = name || '-';
@@ -199,16 +622,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnSig = document.createElement('button');
         btnSig.className = 'btn secondary small';
         btnSig.textContent = '查看簽名';
+        btnSig.dataset.action = 'sig';
 
         if (signatureUrl) {
           btnSig.addEventListener('click', () => {
-            openSignatureViewer(name, signatureUrl);
+            handleToggle(key, tr, 'signature', { signatureUrl });
           });
         } else {
           btnSig.disabled = true;
           btnSig.textContent = '無簽名';
         }
         tdSignature.appendChild(btnSig);
+
+        const tdNote = document.createElement('td');
+        if (noteText) {
+          const btnNote = document.createElement('button');
+          btnNote.className = 'btn secondary small';
+          btnNote.textContent = '查看備註';
+          btnNote.dataset.action = 'note';
+          btnNote.addEventListener('click', () => {
+            handleToggle(key, tr, 'note', { noteText });
+          });
+          tdNote.appendChild(btnNote);
+        } else {
+          tdNote.textContent = '無';
+          tdNote.classList.add('muted');
+        }
 
         tr.appendChild(tdName);
         tr.appendChild(tdClass);
@@ -221,9 +660,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tr.appendChild(tdSignature);
+        tr.appendChild(tdNote);
 
         eventDetailTbody.appendChild(tr);
       });
+    }
+
+    // 原本頁面最底下的 signature-viewer 會造成捲動困擾：這裡一律收起不用
+    if (signatureViewer) {
+      signatureViewer.classList.add('hidden');
+      if (signatureViewerImage) signatureViewerImage.src = '';
     }
 
     // ===== 下半部：未回覆名單 =====
@@ -236,20 +682,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setHidden(eventDetailUnrepliedSection, false);
+const unrepliedView = notReplied.map(rowToView)
+      .filter(v => detailViewState.classFilter === 'ALL' || v.cls === detailViewState.classFilter)
+      .sort((a, b) => {
+        const ca = classOrderKey(a.cls);
+        const cb = classOrderKey(b.cls);
+        if (ca[0] !== cb[0]) return ca[0] - cb[0];
+        if (ca[1] !== cb[1]) return ca[1] - cb[1];
+        return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+      });
 
-    if (!notReplied.length) {
+    if (!unrepliedView.length) {
       eventDetailUnrepliedTbody.innerHTML =
         '<tr><td colspan="3" class="muted">目前沒有未回覆名單。</td></tr>';
       return;
     }
 
     eventDetailUnrepliedTbody.innerHTML = '';
-    notReplied.forEach(row => {
+    unrepliedView.forEach(v => {
+      const row = v.row;
+
       const tr = document.createElement('tr');
 
-      const cls = (row.class != null ? String(row.class) : '');
-      const name = (row.name != null ? String(row.name) : '');
-      const instrument = (row.instrument != null ? String(row.instrument) : '');
+      const cls = v.cls;
+      const name = v.name;
+      const instrument = v.instrument;
 
       const tdName = document.createElement('td');
       tdName.textContent = name || '-';
@@ -291,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
       eventDetailContent.classList.add('hidden');
     }
     eventDetailStats.textContent = '載入中…';
-    eventDetailTbody.innerHTML = '<tr><td colspan="7" class="muted">載入中…</td></tr>';
+    eventDetailTbody.innerHTML = '<tr><td colspan="8" class="muted">載入中…</td></tr>';
     signatureViewer.classList.add('hidden');
     setHidden(eventDetailSection, false);
 
@@ -343,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // ✅ 判斷這個活動是否有遊覽車欄位（只要有任一回覆帶 goBus/backBus 即為 true）
       const hasBusFields = replied.some(row => {
         try {
-          const ans = row.answer ? JSON.parse(row.answer) : {};
+          const ans = safeParseAnswer(row.answer);
           return !!(ans.goBus || ans.backBus);
         } catch (e) {
           return false;
@@ -356,6 +813,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 儲存明細資料，交給 renderEventDetailTables 處理（含未回覆名單 + 是否顯示搭車欄位）
       currentEventDetailData = { replied, notReplied, hasBusFields };
+      buildClassFilterButtons(currentEventDetailData);
+      syncDetailControlsUI();
       renderEventDetailTables();
     } catch (err) {
       console.error(err);
@@ -370,11 +829,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function openSignatureViewer(studentName, url) {
-    signatureViewer.classList.remove('hidden');
-    signatureViewerInfo.textContent = studentName
-      ? `學生：${studentName} 的家長簽名`
-      : '家長簽名';
-    signatureViewerImage.src = url;
+    // 已改為表格列內展開顯示，保留此函式避免舊程式呼叫出錯。
   }
 
   // 返回列表（只是收起詳細區，summary 繼續留著）

@@ -59,15 +59,31 @@
 
         <p id="event-detail-stats" class="muted" style="margin-top:0.5rem; font-size:0.9rem;"></p>
 
-        <!-- 顯示模式切換：已回覆 vs 已回覆 + 未回覆 -->
-        <div class="event-detail-toolbar" style="margin-top:0.75rem; display:flex; justify-content:flex-end; align-items:center;">
-          <label class="detail-toggle" style="font-size:0.85rem; color:#6b7280; display:inline-flex; align-items:center; gap:0.4rem;">
-            <input type="checkbox" id="detail-show-unreplied" />
-            <span>同時顯示未回覆名單</span>
-          </label>
+        <!-- 排排站大作戰：篩選 / 排序 -->
+        <div class="event-detail-toolbar">
+          <!-- 第一行：班級 -->
+          <div class="detail-row detail-row-classes">
+            <div id="detail-class-filters" class="detail-pills" aria-label="班級篩選"></div>
+          </div>
+
+          <!-- 第二行：排序（綠色按鈕） -->
+          <div class="detail-row detail-row-sort">
+            <div class="detail-label">排序：</div>
+            <div id="detail-sort-pills" class="detail-pills" aria-label="排序方式"></div>
+          </div>
+
+          <!-- 第三行：右側勾選 -->
+          <div class="detail-row detail-row-right">
+            <div class="detail-right">
+              <label class="detail-toggle">
+                <input type="checkbox" id="detail-show-unreplied" />
+                <span>同時顯示未回覆名單</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div class="table-wrapper" style="margin-top:1rem; overflow-x:auto;">
+<div class="table-wrapper" style="margin-top:1rem; overflow-x:auto;">
           <table class="summary-table">
             <thead>
               <tr>
@@ -78,10 +94,11 @@
                 <th>去程遊覽車</th>
                 <th>回程遊覽車</th>
                 <th>簽名</th>
+                <th>備註</th>
               </tr>
             </thead>
             <tbody id="event-detail-tbody">
-              <tr><td colspan="7" class="muted">尚未選擇活動。</td></tr>
+              <tr><td colspan="8" class="muted">尚未選擇活動。</td></tr>
             </tbody>
           </table>
         </div>

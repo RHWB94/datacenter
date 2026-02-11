@@ -59,7 +59,7 @@ function isConsentEvent(ev){
 
 // ✅ 僅特定活動要顯示「去程/回程搭乘遊覽車」選項
 // 請把下面的 '2025-trip-consent' 改成你這次活動的 eventId（可加多個）
-const BUS_TRIP_EVENT_IDS = ['20251213-consent'];
+const BUS_TRIP_EVENT_IDS = ['20260301-consent', '20260307-consent'];
 function isBusTripEvent(ev){
   if (!ev || !ev.eventId) return false;
   const id = String(ev.eventId || '');

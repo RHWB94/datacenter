@@ -7,9 +7,14 @@
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 <body>
+  <!-- 不顯眼的學生端入口（右上角小盒子，回到 index） -->
+  <a href="index.html" class="admin-entry-link" title="回到學生登入頁">
+    <span class="admin-entry-dot"></span>
+    <span class="admin-entry-text">Student</span>
+  </a>
   <header class="app-header">
     <h1>仁和管樂回條系統</h1>
-    <p class="subtitle">管理端・統計與查詢</p>
+    <p class="subtitle">管理、統計</p>
   </header>
 
   <main class="app-main">
@@ -18,8 +23,8 @@
       <h2>管理員登入</h2>
       <form id="admin-login-form" class="form">
         <label class="form-label">
-          管理員 Token
-          <input type="password" name="adminToken" placeholder="請貼上管理員 token" required />
+          管理員 登入
+          <input type="password" name="adminToken" placeholder="請輸入管理員密碼" required />
         </label>
         <button type="submit" class="btn primary full-width">登入</button>
       </form>
@@ -93,12 +98,13 @@
                 <th>結果</th>
                 <th>去程遊覽車</th>
                 <th>回程遊覽車</th>
+                <th>家長乘車</th>
                 <th>簽名</th>
                 <th>備註</th>
               </tr>
             </thead>
             <tbody id="event-detail-tbody">
-              <tr><td colspan="8" class="muted">尚未選擇活動。</td></tr>
+              <tr><td colspan="9" class="muted">尚未選擇活動。</td></tr>
             </tbody>
           </table>
         </div>
@@ -134,7 +140,7 @@
   </main>
 
   <footer class="app-footer">
-    <p>仁和國中管樂團・回條系統（管理端）</p>
+    <p>仁和國中管樂團・回條系統（管理）</p>
   </footer>
 
   <div id="toast" class="toast hidden"></div>

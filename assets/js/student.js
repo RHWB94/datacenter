@@ -59,7 +59,18 @@ function isConsentEvent(ev){
 
 // ✅ 僅特定活動要顯示「去程/回程搭乘遊覽車」選項
 // 請把下面的 '2025-trip-consent' 改成你這次活動的 eventId（可加多個）
-const BUS_TRIP_EVENT_IDS = ['20260301-consent', '20260307-consent', '20260301b-consent', '20260301c-consent', '20260307c-consent'];
+const BUS_TRIP_EVENT_IDS = ['20260307-consent', '20260307c-consent', '20260316a-consent', '20260316b-consent', '20260316c-consent'];
+
+// ✅ 僅特定活動要顯示「家長是否搭乘遊覽車 + 人數（上限5）」
+const PARENT_BUS_EVENT_IDS = ['20260316a-consent', '20260316b-consent', '20260316c-consent'
+  // 在此加入需要顯示家長搭乘欄位的 eventId
+];
+function isParentBusEvent(ev){
+  if (!ev || !ev.eventId) return false;
+  const id = String(ev.eventId || '');
+  return PARENT_BUS_EVENT_IDS.includes(id);
+}
+
 function isBusTripEvent(ev){
   if (!ev || !ev.eventId) return false;
   const id = String(ev.eventId || '');
@@ -275,6 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventDeadlineInfoEl = document.getElementById('event-deadline-info');
   const eventFormContainer = document.getElementById('event-form-container');
   const eventStatusMessageEl = document.getElementById('event-status-message');
+
+  const adminEntryLink = document.querySelector('.admin-entry-link');
+  if (adminEntryLink) {
+    adminEntryLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      // 切換到管理端時，清除兩邊登入狀態與快取，然後導向 admin 頁
+      try { clearStudentSession(); } catch (_) {}
+      try { clearAdminSession(); } catch (_) {}
+      window.location.href = 'admin.html';
+    });
+  }
 
   function renderLoggedInView(student) {
     studentNameEl.textContent = student.name;
@@ -551,7 +573,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // deadline display
       if (ev.deadline) {
-        eventDeadlineInfoEl.textContent = '回覆截止時間：' + ev.deadline;
+        const ddlDisplay = typeof formatDeadlineDisplay === 'function'
+          ? formatDeadlineDisplay(ev.deadline)
+          : ev.deadline;
+        eventDeadlineInfoEl.textContent = '回覆截止時間：' + ddlDisplay;
       } else {
         eventDeadlineInfoEl.textContent = '';
       }
@@ -893,7 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const goLabel = document.createElement('div');
         goLabel.className = 'reply-bus-label';
-        goLabel.textContent = '去程搭乘遊覽車';
+        goLabel.textContent = '學生去程搭乘遊覽車';
         goWrapper.appendChild(goLabel);
 
         const goOptions = document.createElement('div');
@@ -929,7 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const backLabel = document.createElement('div');
         backLabel.className = 'reply-bus-label';
-        backLabel.textContent = '回程搭乘遊覽車';
+        backLabel.textContent = '學生回程搭乘遊覽車';
         backWrapper.appendChild(backLabel);
 
         const backOptions = document.createElement('div');
@@ -958,6 +983,92 @@ document.addEventListener('DOMContentLoaded', () => {
 
         backWrapper.appendChild(backOptions);
         consentSection.appendChild(backWrapper);
+      }
+
+      
+      // 家長是否搭乘遊覽車（上限5人）
+      const showParentBus = isConsent && isParentBusEvent(ev);
+      if (showParentBus) {
+        const existingParentBus = existingAnswer && existingAnswer.parentBus;
+        const existingParentCount = existingAnswer && existingAnswer.parentBusCount;
+
+        const parentWrapper = document.createElement('div');
+        parentWrapper.className = 'reply-bus-field';
+
+        const parentLabel = document.createElement('div');
+        parentLabel.className = 'reply-bus-label';
+        parentLabel.textContent = '家長是否搭乘遊覽車';
+        parentWrapper.appendChild(parentLabel);
+
+        const parentOptions = document.createElement('div');
+        parentOptions.className = 'reply-consent-options';
+
+        ['是', '否'].forEach(val => {
+          const optLabel = document.createElement('label');
+          optLabel.className = 'reply-consent-option';
+
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'parentBus';
+          input.value = val;
+          if (existingParentBus === val) input.checked = true;
+
+          const span = document.createElement('span');
+          span.className = 'reply-consent-label';
+          span.textContent = val;
+
+          optLabel.appendChild(input);
+          optLabel.appendChild(span);
+          parentOptions.appendChild(optLabel);
+        });
+
+        parentWrapper.appendChild(parentOptions);
+
+        const countWrapper = document.createElement('div');
+        countWrapper.className = 'reply-bus-field';
+        countWrapper.style.display = existingParentBus === '是' ? '' : 'none';
+
+        const countLabel = document.createElement('div');
+        countLabel.className = 'reply-bus-label';
+        countLabel.textContent = '搭乘人數（1-5人）';
+
+        const countInput = document.createElement('select');
+        countInput.name = 'parentBusCount';
+        countInput.className = 'reply-parent-count-input';
+
+        // 預設空白選項（請選擇）
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '請選擇人數';
+        countInput.appendChild(emptyOpt);
+
+        // 1 ~ 5 人的選項
+        for (let i = 1; i <= 5; i++) {
+          const opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = String(i);
+          if (String(existingParentCount || '') === String(i)) {
+            opt.selected = true;
+          }
+          countInput.appendChild(opt);
+        }
+
+        countWrapper.appendChild(countLabel);
+        countWrapper.appendChild(countInput);
+
+        parentWrapper.appendChild(countWrapper);
+        consentSection.appendChild(parentWrapper);
+
+        parentOptions.querySelectorAll('input[name="parentBus"]').forEach(r => {
+          r.addEventListener('change', () => {
+            if (r.value === '是' && r.checked) {
+              countWrapper.style.display = '';
+            } else if (r.value === '否' && r.checked) {
+              countWrapper.style.display = 'none';
+              countInput.value = '';
+            }
+          });
+        });
       }
 
       // 備註（限 50 字）
@@ -1201,6 +1312,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
           answerObj.goBus = goChecked.value;   // "是" or "否"
           answerObj.backBus = backChecked.value;
+        }
+
+        // 家長是否搭乘遊覽車 + 人數（僅在特定活動出現）
+        if (isParentBusEvent(ev)) {
+          const parentBusChecked = form.querySelector('input[name="parentBus"]:checked');
+          answerObj.parentBus = parentBusChecked ? parentBusChecked.value : '';
+
+          // parentBusCount 現在是 select，下方用通用選擇器確保能抓到
+          const parentCountInput = form.querySelector('[name="parentBusCount"]');
+          let countVal = parentCountInput ? parentCountInput.value : '';
+          if (countVal !== '') {
+            const num = parseInt(countVal, 10);
+            if (!Number.isNaN(num)) {
+              let clamped = num;
+              if (clamped < 1) clamped = 1;
+              if (clamped > 5) clamped = 5;
+              answerObj.parentBusCount = clamped;
+            } else {
+              answerObj.parentBusCount = '';
+            }
+          } else {
+            answerObj.parentBusCount = '';
+          }
         }
 
         const sigState = signatureStates['consentSignature'];

@@ -19,12 +19,12 @@
 
   <main class="app-main">
     <!-- 管理員登入區 -->
-    <section id="admin-login-section" class="card">
+    <section id="admin-login-section" class="card login-card admin-login-card">
       <h2>管理員登入</h2>
       <form id="admin-login-form" class="form">
         <label class="form-label">
           管理員 登入
-          <input type="password" name="adminToken" placeholder="請輸入管理員密碼" required />
+          <input type="password" name="adminToken" placeholder="請輸入管理員密碼" inputmode="numeric" pattern="[0-9]*" required />
         </label>
         <button type="submit" class="btn primary full-width">登入</button>
       </form>

@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
   const loginSection = document.getElementById('admin-login-section');
   const adminSection = document.getElementById('admin-section');
 
@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const summaryContainer = document.getElementById('summary-container');
   const summaryEmpty = document.getElementById('summary-empty');
 
-  // 活動詳細相關 DOM
   const eventDetailSection = document.getElementById('event-detail-section');
   const eventDetailTitle = document.getElementById('event-detail-title');
   const eventDetailMeta = document.getElementById('event-detail-meta');
@@ -19,24 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventDetailTbody = document.getElementById('event-detail-tbody');
   const eventDetailBackBtn = document.getElementById('event-detail-back');
 
-  // 額外顯示控制：切換未回覆名單
   const detailShowUnrepliedToggle = document.getElementById('detail-show-unreplied');
   const eventDetailUnrepliedSection = document.getElementById('event-detail-unreplied');
   const eventDetailUnrepliedTbody = document.getElementById('event-detail-unreplied-tbody');
 
-  // 排排站大作戰：排序/篩選
   const detailSortPills = document.getElementById('detail-sort-pills');
   const detailClassFilters = document.getElementById('detail-class-filters');
 
-  // 簽名顯示區
   const signatureViewer = document.getElementById('signature-viewer');
   const signatureViewerInfo = document.getElementById('signature-viewer-info');
   const signatureViewerImage = document.getElementById('signature-viewer-image');
 
-  // 目前這一場活動的詳細資料（含 replied / notReplied + 是否有搭車欄位）
   let currentEventDetailData = null;
 
-  // 「查看結果」請求的最新編號與按鈕：確保只處理最後一次點擊
   let latestViewResultsRequestId = 0;
   let latestViewResultsButton = null;
 
@@ -44,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (studentEntryLink) {
     studentEntryLink.addEventListener('click', (e) => {
       e.preventDefault();
-      // 切換到學生端時，清除兩邊登入狀態與管理端快取，然後導向 index 頁
       try { clearAdminSession(); } catch (_) {}
       try { clearStudentSession(); } catch (_) {}
       clearAdminDetailCache();
@@ -55,26 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-// ===== 管理端：活動詳細快取（避免切換活動每次等 3-5 秒）=====
-// eventId -> { data, fetchedAt }
 const adminEventDetailCache = new Map();
-// eventId -> Promise（避免同一活動重複發 request）
 const adminEventDetailInFlight = new Map();
 
-// 解析 deadline：支援 "YYYY/MM/DD" 以及可能的 "YYYY/MM/DD HH:mm" / "YYYY/MM/DD HH:mm:ss"
 function parseDeadlineToMs(deadlineStr) {
   const s0 = (deadlineStr || '').toString().trim();
   if (!s0) return null;
 
-  // normalize: YYYY/MM/DD -> YYYY-MM-DD
   let s = s0.replace(/\//g, '-');
 
-  // if has space before time, replace with 'T'
   if (/\d\s+\d/.test(s)) {
     s = s.replace(/\s+/, 'T');
   }
 
-  // if only date, add time
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     s = s + 'T00:00:00';
   }
@@ -84,32 +70,27 @@ function parseDeadlineToMs(deadlineStr) {
   return Number.isFinite(t) ? t : null;
 }
 
-// 顯示用：將 deadline 字串轉成「YYYY/M/D，23:59:59」或保留原時間
 function formatDeadlineDisplay(deadlineStr) {
   const raw = (deadlineStr || '').toString().trim();
   if (!raw) return '';
 
-  // 抓出日期部分（允許 YYYY/M/D 或 YYYY-MM-DD）
   const dateMatch = raw.match(/(\d{4}[\/-]\d{1,2}[\/-]\d{1,2})/);
   if (!dateMatch) return raw;
 
-  let datePart = dateMatch[1].replace(/-/g, '/'); // 一律用 /
+  let datePart = dateMatch[1].replace(/-/g, '/');
 
-  // 判斷是否已經有時間
   const timeMatch = raw.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
   if (timeMatch) {
-    // 若原本就有時間，就顯示「日期 時間」
     return `${datePart} ${timeMatch[1]}`;
   }
 
-  // 只有日期：補上 23:59:59
-  return `${datePart}，23:59:59`;
+  return `${datePart} 23:59:59`;
 }
 
 function isFreshCache(entry, ttlMs) {
   if (!entry) return false;
   const ttl = ttlMs != null ? ttlMs : 0;
-  if (ttl <= 0) return true; // ttl<=0 表示永遠視為新（不建議，但保留彈性）
+  if (ttl <= 0) return true;
   return (Date.now() - entry.fetchedAt) < ttl;
 }
 
@@ -162,20 +143,18 @@ async function mapLimit(items, limit, mapper) {
 }
 
 function pickNewestFiveEventIdsByDeadline(entries) {
-  // entries: [ [eventId, info], ... ]
   const withMs = entries.map(([eid, info]) => {
     const ev = (info && info.event) || {};
     const ms = parseDeadlineToMs(ev.deadline);
     return { eid, ms };
   });
 
-  // 有 deadline 的先排序；沒有的丟後面
   withMs.sort((a, b) => {
     const ta = a.ms, tb = b.ms;
     if (ta == null && tb == null) return 0;
     if (ta == null) return 1;
     if (tb == null) return -1;
-    return tb - ta; // 新到舊
+    return tb - ta;
   });
 
   return withMs.slice(0, 5).map(x => x.eid);
@@ -186,8 +165,11 @@ function clearAdminDetailCache() {
   adminEventDetailInFlight.clear();
 }
 
+function isParentAttendanceEventId(eventId) {
+  return String(eventId || '').endsWith('-parent-attendance');
+}
+
 function ensureSummaryRefreshButton() {
-  // 在「活動回覆統計」標題旁加上「重新抓取資料」按鈕（只做一次）
   const summarySection = summaryContainer ? summaryContainer.closest('section.card') : null;
   if (!summarySection) return;
 
@@ -202,14 +184,13 @@ function ensureSummaryRefreshButton() {
   wrap.style.justifyContent = 'space-between';
   wrap.style.gap = '0.75rem';
 
-  // keep existing h2
   const h2Clone = h2; // move node
 
   const btn = document.createElement('button');
   btn.id = 'summary-refresh-btn';
   btn.className = 'btn secondary small';
   btn.type = 'button';
-  btn.textContent = '重新抓取資料';
+  btn.textContent = '重新整理';
 
   btn.addEventListener('click', async () => {
     const session = getAdminSession();
@@ -221,22 +202,20 @@ function ensureSummaryRefreshButton() {
     try {
       clearAdminDetailCache();
       await loadSummary({ forcePrefetch: true });
-      showToast('已重新抓取資料');
+      showToast('已重新整理');
     } catch (e) {
       console.error(e);
-      showToast('重新抓取失敗');
+      showToast('重新整理失敗');
     } finally {
       if (typeof setButtonLoading === 'function') setButtonLoading(btn, false);
     }
   });
 
-  // Replace h2 with wrap(h2 + btn)
   h2.parentNode.insertBefore(wrap, h2);
   wrap.appendChild(h2Clone);
   wrap.appendChild(btn);
 }
 
-  // 排排站大作戰：UI 狀態（跨活動保留）
   const detailViewState = {
     classFilter: 'ALL',
     sortMode: 'instrument',
@@ -249,17 +228,13 @@ function ensureSummaryRefreshButton() {
   function renderLoggedOut() {
     setHidden(adminSection, true);
     setHidden(loginSection, false);
-    // 順便清空詳細區
     setHidden(eventDetailSection, true);
     signatureViewer.classList.add('hidden');
-    // 清空活動詳細快取與狀態
-    clearAdminDetailCache();
     currentEventDetailData = null;
     latestViewResultsRequestId = 0;
     latestViewResultsButton = null;
   }
 
-  // 載入活動總覽統計
   async function loadSummary(opts) {
     const session = getAdminSession();
     if (!session || !session.adminToken) return;
@@ -273,16 +248,15 @@ function ensureSummaryRefreshButton() {
       const byEvent = (res.summary && res.summary.byEvent) || {};
       const entries = Object.entries(byEvent);
 
-      // 活動列表顯示：舊到新（由上到下越新）
       entries.sort((a, b) => {
         const ea = (a[1] && a[1].event) || {};
         const eb = (b[1] && b[1].event) || {};
         const ta = parseDeadlineToMs(ea.deadline);
         const tb = parseDeadlineToMs(eb.deadline);
         if (ta == null && tb == null) return 0;
-        if (ta == null) return -1; // 沒 deadline 視為最舊
+        if (ta == null) return -1;
         if (tb == null) return 1;
-        return ta - tb; // 舊到新
+        return ta - tb;
       });
 
       summaryContainer.innerHTML = '';
@@ -299,7 +273,7 @@ function ensureSummaryRefreshButton() {
       thead.innerHTML = `
         <tr>
           <th>活動</th>
-          <th>名單人數</th>
+          <th>名單總數</th>
           <th>已回覆</th>
           <th>操作</th>
         </tr>
@@ -317,7 +291,7 @@ const total = info.totalRoster || 0;
 const replied = info.replied || 0;
 
 const status = String(ev.status || '').toLowerCase();
-const pillText = status === 'open' ? '開放填寫中' : '未開放填寫';
+const pillText = status === 'open' ? '開放回覆' : '已截止';
 const pillBg = status === 'open' ? '#16a34a' : '#6b7280';
 
 tr.innerHTML = `
@@ -346,14 +320,11 @@ tr.innerHTML = `
       table.appendChild(tbody);
       summaryContainer.appendChild(table);
 
-// 登入後預抓：只預先抓取最新五個活動（依 deadline 新到舊）
 try {
   const newestFive = pickNewestFiveEventIdsByDeadline(entries);
   const forcePrefetch = !!(opts && opts.forcePrefetch);
 
-  // 預抓不阻塞 UI
   mapLimit(newestFive, 3, async (eid) => {
-    // 若不是強制，且已有快取（視為新），就跳過
     const cached = adminEventDetailCache.get(eid);
     if (!forcePrefetch && cached) return true;
     await getAdminEventDetailCached(session.adminToken, eid, { force: forcePrefetch, ttlMs: 60 * 1000 });
@@ -366,22 +337,89 @@ try {
 }
     } catch (err) {
       console.error(err);
-      showToast('讀取統計資料失敗');
+      showToast('載入活動摘要失敗');
     }
   }
 
   
-  // ===== 排排站大作戰：工具函式 =====
+  const DETAIL_TOGGLE_ICONS = {
+    closed: 'assets/icons/eye.svg',
+    open: 'assets/icons/eye-slash.svg'
+  };
+
+  function normalizeClassSortToken(cls) {
+    return String(cls || '')
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/^8/, '八')
+      .replace(/^7/, '七');
+  }
+
   function classOrderKey(cls) {
-    const s = (cls || '').trim();
-    if (!s) return [999, 999, s];
-    const gradeMap = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
-    const secMap = { '甲':1,'乙':2,'丙':3,'丁':4,'戊':5,'己':6,'庚':7,'辛':8,'壬':9,'癸':10 };
-    const gChar = s[0];
-    const secChar = s[1] || '';
-    const g = gradeMap[gChar] ?? 999;
-    const sec = secMap[secChar] ?? 999;
-    return [g, sec, s];
+    const raw = (cls || '').trim();
+    if (!raw) return [9, 999, 999, ''];
+
+    const normalized = normalizeClassSortToken(raw);
+    const preferredRank = {
+      '八甲': 0,
+      '八乙': 1,
+      '七甲': 2,
+      '七乙': 3
+    };
+
+    if (preferredRank[normalized] != null) {
+      return [0, preferredRank[normalized], 0, normalized];
+    }
+
+    const gradeMap = {
+      '一': 1,
+      '二': 2,
+      '三': 3,
+      '四': 4,
+      '五': 5,
+      '六': 6,
+      '七': 7,
+      '八': 8,
+      '九': 9
+    };
+    const sectionMap = {
+      '甲': 0,
+      '乙': 1,
+      '丙': 2,
+      '丁': 3,
+      '戊': 4,
+      '己': 5,
+      '庚': 6,
+      '辛': 7,
+      '壬': 8,
+      '癸': 9
+    };
+    const match = normalized.match(/^([一二三四五六七八九]|\d+)([甲乙丙丁戊己庚辛壬癸]?)/);
+    const gradeToken = match ? match[1] : '';
+    const sectionToken = match ? match[2] : '';
+    const grade = /^\d+$/.test(gradeToken) ? Number(gradeToken) : (gradeMap[gradeToken] || 0);
+    const section = sectionMap[sectionToken] != null ? sectionMap[sectionToken] : 999;
+
+    return [1, grade ? 99 - grade : 999, section, normalized];
+  }
+
+  function compareClassOrder(a, b) {
+    const ka = classOrderKey(a);
+    const kb = classOrderKey(b);
+    if (ka[0] !== kb[0]) return ka[0] - kb[0];
+    if (ka[1] !== kb[1]) return ka[1] - kb[1];
+    if (ka[2] !== kb[2]) return ka[2] - kb[2];
+    return ka[3].localeCompare(kb[3], 'zh-Hant');
+  }
+
+  function setDetailToggleButtonState(btn, isOpen, label) {
+    if (!btn) return;
+    if (btn.disabled) return;
+    btn.classList.toggle('is-active', !!isOpen);
+    btn.dataset.state = isOpen ? 'open' : 'closed';
+    btn.setAttribute('aria-label', `${isOpen ? '收合' : '查看'}${label}`);
+    btn.title = `${isOpen ? '收合' : '查看'}${label}`;
+    btn.innerHTML = `<img class="detail-eye-btn-icon" src="${isOpen ? DETAIL_TOGGLE_ICONS.open : DETAIL_TOGGLE_ICONS.closed}" alt="" aria-hidden="true">`;
   }
 
   function safeParseAnswer(answer) {
@@ -395,7 +433,6 @@ try {
   }
 
   function parseReplyTime(row) {
-    // 盡量相容：row 欄位、或 answer 內欄位
     const direct = row.lastReplyTs ?? row.replyAt ?? row.updatedAt ?? row.createdAt ?? row.timestamp ?? row.time ?? null;
     const candidates = [];
     if (direct != null) candidates.push(direct);
@@ -405,17 +442,14 @@ try {
     if (fromAns != null) candidates.push(fromAns);
 
     for (const v of candidates) {
-      // number: seconds or ms
       if (typeof v === 'number' && isFinite(v)) {
         const ms = v < 2_000_000_000 ? v * 1000 : v;
         const d = new Date(ms);
         if (!isNaN(d.getTime())) return d;
       }
-      // string
       if (typeof v === 'string') {
         const d = new Date(v);
         if (!isNaN(d.getTime())) return d;
-        // numeric string
         const n = Number(v);
         if (isFinite(n)) {
           const ms = n < 2_000_000_000 ? n * 1000 : n;
@@ -439,18 +473,10 @@ try {
       if (c) classes.add(c);
     });
 
-    // 你指定的固定順序（第一行按鈕）
-    const preferred = ['八甲', '八乙', '七甲', '七乙'];
+    const preferred = [];
 
-    // 若活動內有其他班級，追加在後面（依班級順序）
     const extra = Array.from(classes).filter(c => !preferred.includes(c));
-    extra.sort((a, b) => {
-      const ka = classOrderKey(a);
-      const kb = classOrderKey(b);
-      if (ka[0] !== kb[0]) return ka[0] - kb[0];
-      if (ka[1] !== kb[1]) return ka[1] - kb[1];
-      return ka[2].localeCompare(kb[2], 'zh-Hant');
-    });
+    extra.sort((a, b) => compareClassOrder(a, b));
 
     const classList = preferred.concat(extra);
 
@@ -464,7 +490,6 @@ try {
       b.dataset.value = value;
       b.addEventListener('click', () => {
         detailViewState.classFilter = value;
-        // active style
         [...detailClassFilters.querySelectorAll('.pill-btn')].forEach(x => x.classList.remove('is-active'));
         b.classList.add('is-active');
         renderEventDetailTables();
@@ -477,7 +502,6 @@ try {
     detailClassFilters.appendChild(allBtn);
 
     classList.forEach(cls => {
-      // 固定四班即使該活動沒出現也要顯示；若沒有出現則 disabled
       const exists = classes.has(cls);
       const btn = makeBtn(cls, cls);
       if (!exists) {
@@ -489,7 +513,6 @@ try {
       detailClassFilters.appendChild(btn);
     });
 
-    // 若目前選到的班級在本活動不存在，回到 ALL
     if (detailViewState.classFilter !== 'ALL' && !classes.has(detailViewState.classFilter)) {
       detailViewState.classFilter = 'ALL';
       [...detailClassFilters.querySelectorAll('.pill-btn')].forEach(x => x.classList.remove('is-active'));
@@ -503,9 +526,10 @@ try {
     detailSortPills.innerHTML = '';
 
     const items = [
+      { label: '依班級', value: 'class' },
       { label: '依樂器', value: 'instrument' },
-      { label: '新到舊', value: 'time_desc' },
-      { label: '舊到新', value: 'time_asc' },
+      { label: '最新回覆', value: 'time_desc' },
+      { label: '最早回覆', value: 'time_asc' },
     ];
 
     const makeBtn = (label, value) => {
@@ -531,45 +555,38 @@ try {
   }
 
   function syncDetailControlsUI() {
-    // 班級 pills 是動態渲染時會處理 active；排序 pills 在 buildSortPills 處理 active
     buildSortPills();
   }
 
 
 
-// 依照目前模式（checkbox）繪製「已回覆 / 未回覆」兩個區塊
-  
-  // 依照目前模式（checkbox）繪製「已回覆 / 未回覆」兩個區塊
   function renderEventDetailTables() {
     if (!currentEventDetailData) return;
 
     const replied = currentEventDetailData.replied || [];
     const notReplied = currentEventDetailData.notReplied || [];
-    const hasBus = !!currentEventDetailData.hasBusFields; // 是否有 goBus/backBus 欄位
+    const hasBus = !!currentEventDetailData.hasBusFields;
+    const detailMode = currentEventDetailData.detailMode || 'default';
+    const isParentAttendance = detailMode === 'parentAttendance';
     const showUnreplied = detailShowUnrepliedToggle && detailShowUnrepliedToggle.checked;
 
-    // 目前展開中的學生 key（一次只允許展開一人）
-    // key: `${class}__${name}`
     if (!renderEventDetailTables._expandedKey) renderEventDetailTables._expandedKey = null;
 
-    // 調整表頭去程/回程欄位顯示
     const detailTable = eventDetailTbody ? eventDetailTbody.closest('table') : null;
     if (detailTable) {
-      const headerCells = detailTable.querySelectorAll('thead th');
-      // index: 0姓名,1班級,2樂器,3結果,4去程,5回程,6簽名,7備註
-      if (headerCells.length >= 8) {
-        if (hasBus) {
-          headerCells[4].style.display = '';
-          headerCells[5].style.display = '';
+      const headerRow = detailTable.querySelector('thead tr');
+      if (headerRow) {
+        if (isParentAttendance) {
+          headerRow.innerHTML = '<th>姓名</th><th>班級</th><th>樂器</th><th>結果</th><th>簽名</th><th>備註</th>';
+        } else if (hasBus) {
+          headerRow.innerHTML = '<th>姓名</th><th>班級</th><th>樂器</th><th>回覆</th><th>去程搭車</th><th>回程搭車</th><th>家長搭車</th><th>簽名</th><th>備註</th>';
         } else {
-          headerCells[4].style.display = 'none';
-          headerCells[5].style.display = 'none';
+          headerRow.innerHTML = '<th>姓名</th><th>班級</th><th>樂器</th><th>回覆</th><th>簽名</th><th>備註</th>';
         }
       }
     }
 
-    // 若有遊覽車欄位，會顯示：去程 / 回程 / 家長乘車（合併顯示）
-    const COLS = hasBus ? 9 : 6;
+    const COLS = isParentAttendance ? 6 : (hasBus ? 9 : 6);
 
     function normalizeNote(raw) {
       if (raw == null) return '';
@@ -586,7 +603,7 @@ try {
       let noteText = '';
       let parentBus = '';
       let parentBusCount = '';
-
+      let attendeeCount = '';
       try {
         const ans = safeParseAnswer(row.answer);
         resultText =
@@ -595,6 +612,11 @@ try {
           ans.choice ||
           ans.status ||
           ans.attend ||
+          ans.parentAttendance ||
+          ans.parentAttend ||
+          ans.attendanceStatus ||
+          ans.attendanceDecision ||
+          ans.willAttend ||
           ans.consentChoice ||
           '';
 
@@ -613,10 +635,14 @@ try {
           ans.parentBusCount != null && ans.parentBusCount !== ''
             ? String(ans.parentBusCount)
             : '';
-
-        // 備註欄位（多 key 相容）
+        attendeeCount =
+          ans.attendeeCount != null && ans.attendeeCount !== ''
+            ? String(ans.attendeeCount)
+            : '';
         noteText = normalizeNote(
-          ans.parentNote ??   // ✅ 加這行
+          ans.seatNote ??
+          ans.parentNote ??
+          ans.parentAttendanceNote ??
           ans.note ??
           ans.remark ??
           ans.memo ??
@@ -627,10 +653,10 @@ try {
           ''
         );
       } catch (e) {
-        console.warn('解析 answer 失敗', row.answer, e);
+        console.warn('failed to parse answer', row.answer, e);
       }
 
-      return { resultText, signatureUrl, goBus, backBus, parentBus, parentBusCount, noteText };
+      return { resultText, signatureUrl, goBus, backBus, parentBus, parentBusCount, attendeeCount, noteText };
     }
 
     function rowToView(row) {
@@ -645,6 +671,7 @@ try {
         backBus,
         parentBus,
         parentBusCount,
+        attendeeCount,
         noteText
       } = extractFromAnswer(row);
       const replyTime = parseReplyTime(row);
@@ -660,6 +687,7 @@ try {
         backBus,
         parentBus,
         parentBusCount,
+        attendeeCount,
         noteText,
         replyTime
       };
@@ -668,12 +696,10 @@ try {
     function applyFiltersAndSort(list) {
       let out = list.slice();
 
-      // 班級篩選
       if (detailViewState.classFilter && detailViewState.classFilter !== 'ALL') {
         out = out.filter(v => v.cls === detailViewState.classFilter);
       }
 
-      // 排序
       const mode = detailViewState.sortMode || 'class';
       if (mode === 'instrument') {
         out.sort((a, b) => {
@@ -681,11 +707,8 @@ try {
           const ib = b.instrument || '';
           const c = ia.localeCompare(ib, 'zh-Hant');
           if (c !== 0) return c;
-          // 次排序：班級 → 姓名
-          const ca = classOrderKey(a.cls);
-          const cb = classOrderKey(b.cls);
-          if (ca[0] !== cb[0]) return ca[0] - cb[0];
-          if (ca[1] !== cb[1]) return ca[1] - cb[1];
+          const classCompare = compareClassOrder(a.cls, b.cls);
+          if (classCompare !== 0) return classCompare;
           return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
         });
       } else if (mode === 'time_asc' || mode === 'time_desc') {
@@ -700,13 +723,9 @@ try {
           return (ta < tb ? -1 : 1) * dir;
         });
       } else {
-        // class
         out.sort((a, b) => {
-          const ca = classOrderKey(a.cls);
-          const cb = classOrderKey(b.cls);
-          if (ca[0] !== cb[0]) return ca[0] - cb[0];
-          if (ca[1] !== cb[1]) return ca[1] - cb[1];
-          // 次排序：姓名
+          const classCompare = compareClassOrder(a.cls, b.cls);
+          if (classCompare !== 0) return classCompare;
           return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
         });
       }
@@ -718,15 +737,15 @@ try {
       const key = renderEventDetailTables._expandedKey;
       if (!key) return;
 
-      // 找到目前的 anchor row
       const anchor = eventDetailTbody.querySelector(`tr[data-expand-key="${cssEscape(key)}"]`);
       if (anchor) {
         anchor.classList.remove('detail-expanded-anchor');
-        // buttons active
-        anchor.querySelectorAll('button.is-active').forEach(b => b.classList.remove('is-active'));
+        const sigBtn = anchor.querySelector('button[data-action="sig"]');
+        const noteBtn = anchor.querySelector('button[data-action="note"]');
+        setDetailToggleButtonState(sigBtn, false, '簽名');
+        setDetailToggleButtonState(noteBtn, false, '備註');
       }
 
-      // 移除 expand row
       const expandRow = eventDetailTbody.querySelector(`tr.detail-expand-row[data-expand-key="${cssEscape(key)}"]`);
       if (expandRow) expandRow.remove();
 
@@ -734,7 +753,6 @@ try {
     }
 
     function ensureExpandRow(anchorTr, key) {
-      // expand row already exists?
       let expandRow = eventDetailTbody.querySelector(`tr.detail-expand-row[data-expand-key="${cssEscape(key)}"]`);
       if (!expandRow) {
         expandRow = document.createElement('tr');
@@ -747,7 +765,6 @@ try {
         const wrap = document.createElement('div');
         wrap.className = 'detail-expand-wrap';
 
-        // signature panel
         const sigPanel = document.createElement('div');
         sigPanel.className = 'detail-panel';
         sigPanel.dataset.panel = 'signature';
@@ -757,7 +774,6 @@ try {
           <img class="detail-signature-img" alt="家長簽名" />
         `;
 
-        // note panel
         const notePanel = document.createElement('div');
         notePanel.className = 'detail-panel';
         notePanel.dataset.panel = 'note';
@@ -772,7 +788,6 @@ try {
         td.appendChild(wrap);
         expandRow.appendChild(td);
 
-        // insert after anchor
         if (anchorTr.nextSibling) eventDetailTbody.insertBefore(expandRow, anchorTr.nextSibling);
         else eventDetailTbody.appendChild(expandRow);
       }
@@ -785,14 +800,16 @@ try {
       if (visible) panel.classList.remove('hidden');
       else panel.classList.add('hidden');
 
-      // 如果兩個都 hidden，整個 expand row 就移除
       const anyVisible = [...expandRow.querySelectorAll('.detail-panel')].some(p => !p.classList.contains('hidden'));
       if (!anyVisible) {
         const key = expandRow.dataset.expandKey;
         const anchor = eventDetailTbody.querySelector(`tr[data-expand-key="${cssEscape(key)}"]`);
         if (anchor) {
           anchor.classList.remove('detail-expanded-anchor');
-          anchor.querySelectorAll('button.is-active').forEach(b => b.classList.remove('is-active'));
+          const sigBtn = anchor.querySelector('button[data-action="sig"]');
+          const noteBtn = anchor.querySelector('button[data-action="note"]');
+          setDetailToggleButtonState(sigBtn, false, '簽名');
+          setDetailToggleButtonState(noteBtn, false, '備註');
         }
         expandRow.remove();
         if (renderEventDetailTables._expandedKey === key) renderEventDetailTables._expandedKey = null;
@@ -800,17 +817,14 @@ try {
     }
 
     function cssEscape(str) {
-      // minimal escape for attribute selector
       return String(str).replace(/["\\]/g, '\\$&');
     }
 
     function handleToggle(key, anchorTr, type, payload) {
-      // 若點的是另一個人：先收起舊的，再展開新的
       if (renderEventDetailTables._expandedKey && renderEventDetailTables._expandedKey !== key) {
         collapseCurrentExpanded();
       }
 
-      // 設定目前展開 key
       if (!renderEventDetailTables._expandedKey) renderEventDetailTables._expandedKey = key;
 
       anchorTr.classList.add('detail-expanded-anchor');
@@ -826,17 +840,13 @@ try {
         if (isOpen) {
           setPanelVisible(expandRow, 'signature', false);
           if (btn) {
-            btn.classList.remove('is-active');
-            // 閉眼圖示（收起）
-            btn.textContent = '🙈';
+            setDetailToggleButtonState(btn, false, '簽名');
           }
         } else {
           if (img) img.src = payload.signatureUrl || '';
           setPanelVisible(expandRow, 'signature', true);
           if (btn) {
-            btn.classList.add('is-active');
-            // 睜眼圖示（展開）
-            btn.textContent = '👁️';
+            setDetailToggleButtonState(btn, true, '簽名');
           }
         }
       }
@@ -850,26 +860,21 @@ try {
         if (isOpen) {
           setPanelVisible(expandRow, 'note', false);
           if (btn) {
-            btn.classList.remove('is-active');
-            // 閉眼圖示（收起）
-            btn.textContent = '🙈';
+            setDetailToggleButtonState(btn, false, '備註');
           }
         } else {
           if (box) box.textContent = payload.noteText || '';
           setPanelVisible(expandRow, 'note', true);
           if (btn) {
-            btn.classList.add('is-active');
-            // 睜眼圖示（展開）
-            btn.textContent = '👁️';
+            setDetailToggleButtonState(btn, true, '備註');
           }
         }
       }
     }
 
-    // ===== 上半部：已回覆名單 =====
     if (!replied.length) {
       eventDetailTbody.innerHTML =
-        `<tr><td colspan="${COLS}" class="muted">目前尚無回覆。</td></tr>`;
+        `<tr><td colspan="${COLS}" class="muted">目前沒有任何回覆</td></tr>`;
     } else {
       eventDetailTbody.innerHTML = '';
       renderEventDetailTables._expandedKey = null;
@@ -877,7 +882,7 @@ try {
       const viewRows = applyFiltersAndSort(replied.map(rowToView));
 
       if (!viewRows.length) {
-        eventDetailTbody.innerHTML = `<tr><td colspan="${COLS}" class="muted">沒有符合篩選條件的資料。</td></tr>`;
+        eventDetailTbody.innerHTML = `<tr><td colspan="${COLS}" class="muted">目前篩選條件下沒有資料</td></tr>`;
         return;
       }
 
@@ -896,6 +901,7 @@ try {
           backBus,
           parentBus,
           parentBusCount,
+          attendeeCount,
           noteText
         } = v;
 
@@ -912,7 +918,19 @@ try {
         tdInstrument.textContent = instrument || '-';
 
         const tdResult = document.createElement('td');
-        tdResult.textContent = resultText || '-';
+        if (isParentAttendance) {
+          if (resultText === '不出席') {
+            tdResult.textContent = '不出席';
+          } else if (attendeeCount) {
+            tdResult.textContent = `${attendeeCount}人出席`;
+          } else if (resultText === '出席') {
+            tdResult.textContent = '出席';
+          } else {
+            tdResult.textContent = '-';
+          }
+        } else {
+          tdResult.textContent = resultText || '-';
+        }
 
         const tdGoBus = document.createElement('td');
         tdGoBus.textContent = goBus || '-';
@@ -920,22 +938,20 @@ try {
         const tdBackBus = document.createElement('td');
         tdBackBus.textContent = backBus || '-';
 
-        // 家長乘車顯示：若不搭乘顯示「否」，若搭乘顯示「X人」
         const tdParentBus = document.createElement('td');
         let parentDisplay = '-';
-        if (parentBus === '是' && parentBusCount) {
-          parentDisplay = `${parentBusCount}人`;
-        } else if (parentBus === '否' || parentBus === '' || !parentBus) {
-          parentDisplay = '否';
+        if (parentBusCount) {
+          parentDisplay = String(parentBusCount);
+        } else if (parentBus) {
+          parentDisplay = String(parentBus);
         }
         tdParentBus.textContent = parentDisplay;
 
         const tdSignature = document.createElement('td');
         const btnSig = document.createElement('button');
         btnSig.className = 'btn secondary small detail-eye-btn';
-        btnSig.textContent = '🙈'; // 初始為「閉眼」圖示
         btnSig.dataset.action = 'sig';
-        btnSig.title = '檢視簽名';
+        setDetailToggleButtonState(btnSig, false, '簽名');
 
         if (signatureUrl) {
           btnSig.addEventListener('click', () => {
@@ -943,7 +959,9 @@ try {
           });
         } else {
           btnSig.disabled = true;
-          btnSig.textContent = '無簽名';
+          btnSig.textContent = '無';
+          btnSig.title = '沒有簽名';
+          btnSig.setAttribute('aria-label', '沒有簽名');
         }
         tdSignature.appendChild(btnSig);
 
@@ -951,9 +969,8 @@ try {
         if (noteText) {
           const btnNote = document.createElement('button');
           btnNote.className = 'btn secondary small detail-eye-btn';
-          btnNote.textContent = '🙈'; // 初始為「閉眼」圖示
           btnNote.dataset.action = 'note';
-          btnNote.title = '檢視備註';
+          setDetailToggleButtonState(btnNote, false, '備註');
           btnNote.addEventListener('click', () => {
             handleToggle(key, tr, 'note', { noteText });
           });
@@ -968,7 +985,7 @@ try {
         tr.appendChild(tdInstrument);
         tr.appendChild(tdResult);
 
-        if (hasBus) {
+        if (!isParentAttendance && hasBus) {
           tr.appendChild(tdGoBus);
           tr.appendChild(tdBackBus);
           tr.appendChild(tdParentBus);
@@ -981,13 +998,11 @@ try {
       });
     }
 
-    // 原本頁面最底下的 signature-viewer 會造成捲動困擾：這裡一律收起不用
     if (signatureViewer) {
       signatureViewer.classList.add('hidden');
       if (signatureViewerImage) signatureViewerImage.src = '';
     }
 
-    // ===== 下半部：未回覆名單 =====
     if (!eventDetailUnrepliedSection || !eventDetailUnrepliedTbody) return;
 
     if (!showUnreplied) {
@@ -997,19 +1012,17 @@ try {
     }
 
     setHidden(eventDetailUnrepliedSection, false);
-const unrepliedView = notReplied.map(rowToView)
+    const unrepliedView = notReplied.map(rowToView)
       .filter(v => detailViewState.classFilter === 'ALL' || v.cls === detailViewState.classFilter)
       .sort((a, b) => {
-        const ca = classOrderKey(a.cls);
-        const cb = classOrderKey(b.cls);
-        if (ca[0] !== cb[0]) return ca[0] - cb[0];
-        if (ca[1] !== cb[1]) return ca[1] - cb[1];
+        const classCompare = compareClassOrder(a.cls, b.cls);
+        if (classCompare !== 0) return classCompare;
         return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
       });
 
     if (!unrepliedView.length) {
       eventDetailUnrepliedTbody.innerHTML =
-        '<tr><td colspan="3" class="muted">目前沒有未回覆名單。</td></tr>';
+        '<tr><td colspan="3" class="muted">目前沒有未回覆名單</td></tr>';
       return;
     }
 
@@ -1040,13 +1053,10 @@ const unrepliedView = notReplied.map(rowToView)
     });
   }
 
-  // 點「查看結果」→ 載入單一活動詳細
   async function handleViewResults(eventId, ev, triggerBtn) {
-    // 每次點擊都遞增請求編號，僅最後一次點擊的請求可以更新畫面
     latestViewResultsRequestId += 1;
     const requestId = latestViewResultsRequestId;
 
-    // 只讓「最後一個被點擊」的按鈕顯示載入動畫，其餘立即關閉
     if (typeof setButtonLoading === 'function' && triggerBtn) {
       if (latestViewResultsButton && latestViewResultsButton !== triggerBtn) {
         setButtonLoading(latestViewResultsButton, false);
@@ -1061,12 +1071,10 @@ const unrepliedView = notReplied.map(rowToView)
       return;
     }
 
-    // 若在等待過程中已經有更新的請求出現，這個舊請求就直接停止（不再動畫面）
     if (requestId !== latestViewResultsRequestId) {
       return;
     }
 
-    // 預先清空畫面（只會在「目前仍是最後一次點擊」的情況下執行）
     eventDetailTitle.textContent = ev.title || eventId;
     currentEventDetailData = null;
     if (detailShowUnrepliedToggle) { detailShowUnrepliedToggle.checked = false; }
@@ -1076,16 +1084,14 @@ const unrepliedView = notReplied.map(rowToView)
       eventDetailContent.textContent = '';
       eventDetailContent.classList.add('hidden');
     }
-    eventDetailStats.textContent = '載入中…';
-    // 這裡只是暫時佔位，不需要精準符合 hasBus 狀態，直接使用目前表頭的總欄數 9
-    eventDetailTbody.innerHTML = '<tr><td colspan="9" class="muted">載入中…</td></tr>';
+    eventDetailStats.textContent = '載入中...';
+    eventDetailTbody.innerHTML = '<tr><td colspan="9" class="muted">載入中...</td></tr>';
     signatureViewer.classList.add('hidden');
     setHidden(eventDetailSection, false);
 
     try {
       const data = await getAdminEventDetailCached(session.adminToken, eventId, { ttlMs: 60 * 1000 });
 
-      // 回來時再次確認：若這時已經有更新的點擊，就忽略這次結果
       if (requestId !== latestViewResultsRequestId) {
         return;
       }
@@ -1097,10 +1103,8 @@ const unrepliedView = notReplied.map(rowToView)
       const notRepliedCount = data.notRepliedCount || 0;
       const replyRate = (data.replyRate != null ? data.replyRate + '%' : '-');
 
-      // 標題
       eventDetailTitle.textContent = eventInfo.title || ev.title || eventId;
 
-      // 基本資訊
       const dateStr = eventInfo.date || eventInfo.startAt || '';
       const placeStr = eventInfo.place || '';
       const contactStr = eventInfo.contact || '';
@@ -1116,7 +1120,6 @@ const unrepliedView = notReplied.map(rowToView)
       if (contactStr) metaParts.push(`聯絡人：${contactStr}`);
       eventDetailMeta.textContent = metaParts.join('｜');
 
-      // 活動內容／同意書內容（statDescription）
       if (eventDetailContent) {
         const desc = eventInfo.statDescription || '';
         if (desc) {
@@ -1128,7 +1131,6 @@ const unrepliedView = notReplied.map(rowToView)
         }
       }
 
-      // ✅ 判斷這個活動是否有遊覽車欄位（只要有任一回覆帶 goBus/backBus 即為 true）
       const hasBusFields = replied.some(row => {
         try {
           const ans = safeParseAnswer(row.answer);
@@ -1138,24 +1140,21 @@ const unrepliedView = notReplied.map(rowToView)
         }
       });
 
-      // 統計文字
       eventDetailStats.textContent =
-        `總人數：${total}　已回覆：${repliedCount}　未回覆：${notRepliedCount}　回覆率：${replyRate}`;
+        `名單總數：${total}｜已回覆：${repliedCount}｜未回覆：${notRepliedCount}｜回覆率：${replyRate}`;
 
-      // 儲存明細資料，交給 renderEventDetailTables 處理（含未回覆名單 + 是否顯示搭車欄位）
-      currentEventDetailData = { replied, notReplied, hasBusFields };
+      const detailMode = isParentAttendanceEventId(eventId) ? 'parentAttendance' : 'default';
+      currentEventDetailData = { replied, notReplied, hasBusFields, detailMode };
       buildClassFilterButtons(currentEventDetailData);
       syncDetailControlsUI();
       renderEventDetailTables();
     } catch (err) {
-      // 發生錯誤時，也只在這仍是最後一次點擊的情況下更新畫面
       if (requestId === latestViewResultsRequestId) {
         console.error(err);
-        showToast('載入活動詳細失敗（網路或系統錯誤）');
-        eventDetailStats.textContent = '載入失敗。';
+        showToast('載入活動明細失敗，請稍後再試');
+        eventDetailStats.textContent = '載入失敗';
       }
     } finally {
-      // 只有當這個請求仍是最後一次點擊時，才結束按鈕載入狀態
       if (
         typeof setButtonLoading === 'function' &&
         triggerBtn &&
@@ -1168,10 +1167,12 @@ const unrepliedView = notReplied.map(rowToView)
   }
 
   function openSignatureViewer(studentName, url) {
-    // 已改為表格列內展開顯示，保留此函式避免舊程式呼叫出錯。
+    if (!signatureViewer || !signatureViewerImage) return;
+    signatureViewer.classList.remove('hidden');
+    signatureViewerInfo.textContent = studentName ? `${studentName} 的簽名` : '家長簽名';
+    signatureViewerImage.src = url || '';
   }
 
-  // 返回列表（只是收起詳細區，summary 繼續留著）
   eventDetailBackBtn.addEventListener('click', () => {
     setHidden(eventDetailSection, true);
     signatureViewer.classList.add('hidden');
@@ -1189,7 +1190,6 @@ const unrepliedView = notReplied.map(rowToView)
     }
   });
 
-  // Login
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.textContent = '';
@@ -1198,7 +1198,7 @@ const unrepliedView = notReplied.map(rowToView)
     const formData = new FormData(loginForm);
     const token = (formData.get('adminToken') || '').toString().trim();
     if (!token) {
-      loginError.textContent = '請輸入 token。';
+      loginError.textContent = '請輸入管理員 token';
       loginError.classList.remove('hidden');
       return;
     }
@@ -1210,7 +1210,7 @@ const unrepliedView = notReplied.map(rowToView)
     try {
       const res = await authAdmin(token);
       if (!res.ok || res.role !== 'admin') {
-        loginError.textContent = '登入失敗，請確認 token 是否正確。';
+        loginError.textContent = '管理員登入失敗，請確認 token';
         loginError.classList.remove('hidden');
         return;
       }
@@ -1220,7 +1220,7 @@ const unrepliedView = notReplied.map(rowToView)
       loadSummary();
     } catch (err) {
       console.error(err);
-      loginError.textContent = '登入失敗（網路或系統錯誤）';
+      loginError.textContent = '登入失敗，請稍後再試';
       loginError.classList.remove('hidden');
     } finally {
       if (typeof setButtonLoading === 'function' && loginSubmitBtn) {
@@ -1233,7 +1233,7 @@ const unrepliedView = notReplied.map(rowToView)
     clearAdminSession();
     renderLoggedOut();
     summaryContainer.innerHTML = '';
-    showToast('已登出管理員');
+    showToast('已登出');
   });
 
   if (detailShowUnrepliedToggle) {
@@ -1242,10 +1242,11 @@ const unrepliedView = notReplied.map(rowToView)
     });
   }
 
-  // Auto restore
   const adminSession = getAdminSession();
   if (adminSession && adminSession.adminToken) {
     renderLoggedIn();
     loadSummary();
   }
 });
+
+

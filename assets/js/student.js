@@ -77,7 +77,43 @@
         required: true
       }
     ]
+  },
+
+  '20260321b-parent-attendance': {
+    title: '家長出席統計',
+    appendDefaultParentNote: false,
+    fields: [
+      {
+        id: 'parentAttendance',
+        label: '家長是否出席',
+        type: 'radio',
+        variant: 'reply-consent',
+        optionsAlign: 'left',
+        required: true,
+        options: ['出席', '不出席']
+      },
+      {
+        id: 'attendeeCount',
+        label: '出席人數',
+        type: 'select',
+        required: true,
+        options: ['1', '2', '3', '4']
+      },
+      {
+        id: 'seatNote',
+        label: '備註',
+        type: 'textarea',
+        placeholder: '若需備註請於此填寫'
+      },
+      {
+        id: 'parentSignature',
+        label: '家長簽名',
+        type: 'signature',
+        required: true
+      }
+    ]
   }
+
 };
 
 function getFormDefinition(ev) {

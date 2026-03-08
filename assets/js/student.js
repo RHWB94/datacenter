@@ -52,6 +52,8 @@
         id: 'parentAttendance',
         label: '家長是否出席',
         type: 'radio',
+        variant: 'reply-consent',
+        optionsAlign: 'left',
         required: true,
         options: ['出席', '不出席']
       },
@@ -66,7 +68,7 @@
         id: 'seatNote',
         label: '備註',
         type: 'textarea',
-        placeholder: '例如：需安排連號座位、晚到等'
+        placeholder: '若需備註請於此填寫'
       },
       {
         id: 'parentSignature',
@@ -95,9 +97,42 @@ function isConsentEvent(ev){
   return id.endsWith('-consent');
 }
 
+  // 依據活動 ID 判斷是否為需要搭乘巴士的同意書活動，這裡列出所有相關活動 ID，未來如果有新增需要搭乘巴士的同意書活動，再將其 ID 加入此陣列即可
 const BUS_TRIP_EVENT_IDS = ['20260307-consent', '20260307c-consent', '20260316a-consent', '20260316b-consent', '20260316c-consent'];
 
+  // 依據活動 ID 判斷是否為家長出席統計活動，這裡列出所有相關活動 ID，未來如果有新增家長出席統計活動，再將其 ID 加入此陣列即可
 const PARENT_BUS_EVENT_IDS = ['20260316a-consent', '20260316b-consent', '20260316c-consent'];
+
+const EVENT_CUSTOM_DESCRIPTIONS = {
+  // 依活動 ID 客製化補充說明，可自由調整文字與換行（使用 \n）
+  // '20260321a-parent-attendance': '第一行說明\n第二行說明'
+  '20260321a-parent-attendance': '1. 學期團務說明\n2. 6/18成果發表會工作分配\n3. 樂團現況更新',
+  '20260321b-parent-attendance': '1. 學期團務說明\n2. 6/18成果發表會工作分配\n3. 樂團現況更新'
+};
+
+function formatDeadlineDisplay(deadlineStr) {
+  const raw = (deadlineStr || '').toString().trim();
+  if (!raw) return '';
+
+  const dateMatch = raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if (!dateMatch) return raw;
+
+  const y = dateMatch[1];
+  const m = dateMatch[2].padStart(2, '0');
+  const d = dateMatch[3].padStart(2, '0');
+
+  const timeMatch = raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  let hh = '23';
+  let mm = '59';
+  let ss = '59';
+  if (timeMatch) {
+    hh = String(timeMatch[1]).padStart(2, '0');
+    mm = String(timeMatch[2]).padStart(2, '0');
+    ss = String(timeMatch[3] || '00').padStart(2, '0');
+  }
+
+  return `${y}-${m}-${d} | ${hh}:${mm}:${ss}`;
+}
 function isParentBusEvent(ev){
   if (!ev || !ev.eventId) return false;
   const id = String(ev.eventId || '');
@@ -299,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventTitleEl = document.getElementById('event-title');
   const eventMetaEl = document.getElementById('event-meta');
   const eventDescEl = document.getElementById('event-desc');
+  const eventCustomDescEl = document.getElementById('event-custom-desc');
   const eventDeadlineInfoEl = document.getElementById('event-deadline-info');
   const eventFormContainer = document.getElementById('event-form-container');
   const eventStatusMessageEl = document.getElementById('event-status-message');
@@ -575,11 +611,14 @@ document.addEventListener('DOMContentLoaded', () => {
       eventTitleEl.textContent = ev.title || ev.eventId;
       eventMetaEl.textContent = [ev.date || ev.startAt || '', ev.place || ''].filter(Boolean).join('｜');
       eventDescEl.textContent = ev.statDescription || '';
+      if (eventCustomDescEl) {
+        const customDesc = EVENT_CUSTOM_DESCRIPTIONS[ev.eventId] || '';
+        eventCustomDescEl.textContent = customDesc;
+        eventCustomDescEl.classList.toggle('hidden', !customDesc);
+      }
 
       if (ev.deadline) {
-        const ddlDisplay = typeof formatDeadlineDisplay === 'function'
-          ? formatDeadlineDisplay(ev.deadline)
-          : ev.deadline;
+        const ddlDisplay = formatDeadlineDisplay(ev.deadline);
         eventDeadlineInfoEl.textContent = '回覆截止：' + ddlDisplay;
       } else {
         eventDeadlineInfoEl.textContent = '';
@@ -705,8 +744,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (field.type === 'radio') {
         const opts = document.createElement('div');
-        opts.className = 'options';
-        if (field.variant === 'choice-chips') {
+        const useConsentStyle = field.variant === 'reply-consent';
+        opts.className = useConsentStyle ? 'reply-consent-options' : 'options';
+        if (useConsentStyle && field.optionsAlign === 'left') {
+          opts.classList.add('reply-consent-options-left');
+        }
+        if (field.variant === 'choice-chips' && !useConsentStyle) {
           opts.classList.add('options-choice-chips');
         }
 
@@ -714,7 +757,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         (field.options || []).forEach(opt => {
           const optLabel = document.createElement('label');
-          if (field.variant === 'choice-chips') {
+          if (useConsentStyle) {
+            optLabel.className = 'reply-consent-option';
+          } else if (field.variant === 'choice-chips') {
             optLabel.className = 'option-chip';
           }
           const input = document.createElement('input');
@@ -723,7 +768,14 @@ document.addEventListener('DOMContentLoaded', () => {
           input.value = opt;
           if (opt === current) input.checked = true;
           optLabel.appendChild(input);
-          optLabel.appendChild(document.createTextNode(' ' + opt));
+          if (useConsentStyle) {
+            const span = document.createElement('span');
+            span.className = 'reply-consent-label';
+            span.textContent = opt;
+            optLabel.appendChild(span);
+          } else {
+            optLabel.appendChild(document.createTextNode(' ' + opt));
+          }
           opts.appendChild(optLabel);
         });
 

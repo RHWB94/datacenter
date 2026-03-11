@@ -5,7 +5,12 @@
   const loginForm = document.getElementById('admin-login-form');
   const loginError = document.getElementById('admin-login-error');
   const loginSubmitBtn = loginForm ? loginForm.querySelector('button[type="submit"]') : null;
+  const adminTokenInput = loginForm ? loginForm.querySelector('input[name="adminToken"]') : null;
   const logoutBtn = document.getElementById('admin-logout-btn');
+
+  if (adminTokenInput) {
+    adminTokenInput.setAttribute('autocomplete', 'new-password');
+  }
 
   const summaryContainer = document.getElementById('summary-container');
   const summaryEmpty = document.getElementById('summary-empty');
@@ -233,6 +238,17 @@ function ensureSummaryRefreshButton() {
     currentEventDetailData = null;
     latestViewResultsRequestId = 0;
     latestViewResultsButton = null;
+    clearAdminDetailCache();
+    summaryContainer.innerHTML = '';
+    summaryEmpty.classList.add('hidden');
+    loginError.textContent = '';
+    loginError.classList.add('hidden');
+    if (loginForm) {
+      loginForm.reset();
+      if (adminTokenInput) {
+        adminTokenInput.value = '';
+      }
+    }
   }
 
   async function loadSummary(opts) {
@@ -1232,7 +1248,6 @@ try {
   logoutBtn.addEventListener('click', () => {
     clearAdminSession();
     renderLoggedOut();
-    summaryContainer.innerHTML = '';
     showToast('已登出');
   });
 

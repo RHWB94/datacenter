@@ -225,6 +225,10 @@ body {
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
+.events-loading {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
 .event-card {
   border-radius: 14px;
   border: 1px solid #e5e7eb;
@@ -353,6 +357,37 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary-soft);
 }
+
+.form-select-modern {
+  min-height: 3.2rem;
+  padding: 0.8rem 2.8rem 0.8rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #475569 50%),
+    linear-gradient(135deg, #475569 50%, transparent 50%),
+    linear-gradient(180deg, #ffffff, #f8fafc);
+  background-position:
+    calc(100% - 1.15rem) calc(50% - 0.14rem),
+    calc(100% - 0.8rem) calc(50% - 0.14rem),
+    0 0;
+  background-size:
+    0.45rem 0.45rem,
+    0.45rem 0.45rem,
+    100% 100%;
+  background-repeat: no-repeat;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.form-select-modern:hover {
+  border-color: #94a3b8;
+}
 .textblock.textblock-panel {
   padding: 0.9rem 1rem;
   border: 1px solid #dbeafe;
@@ -400,6 +435,7 @@ body {
 .form-field textarea {
   width: 100%;
   min-height: 80px;
+  font-size: 16px;
 }
 
 /* 同意書文字 */
@@ -416,6 +452,30 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.signature-trigger-btn {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  background: #d8e1eb;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: none;
+}
+
+.signature-trigger-btn:hover {
+  background: #cfd9e4;
+  border-color: #bcc8d6;
+  transform: none;
+}
+
+.signature-trigger-btn:disabled {
+  opacity: 0.72;
 }
 
 .signature-panel {
@@ -652,7 +712,7 @@ body {
 .reply-question {
   font-size: 1.05rem;
   font-weight: 600;
-  margin: 0 0 0.6rem;
+  margin: 0 0 1rem;
 }
 
 .reply-question-name {
@@ -704,13 +764,13 @@ body {
 }
 
 .reply-note-wrapper {
-  margin-top: 0.3rem;
+  margin-top: 1rem;
 }
 
 .reply-note-label {
   display: block;
   font-size: 0.9rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.7rem;
 }
 
 .reply-note-textarea {
@@ -718,7 +778,7 @@ body {
   min-height: 54px;
   max-height: 96px;
   resize: vertical;
-  font-size: 0.9rem;
+  font-size: 16px;
   padding: 0.4rem 0.5rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -730,7 +790,32 @@ body {
 }
 
 .reply-signature-field {
-  margin-top: 0.7rem;
+  margin-top: 1.1rem;
+}
+
+.reply-signature-field > div:first-child {
+  margin-bottom: 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.reply-parent-count-input {
+  width: 100%;
+  margin-top: 0.65rem;
+}
+
+.reply-bus-field select {
+  width: 100%;
+}
+
+.reply-bus-field {
+  margin-top: 1rem;
+}
+
+.reply-bus-label {
+  margin-bottom: 0.7rem;
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 

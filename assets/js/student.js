@@ -346,6 +346,10 @@ function buildDrivePreviewUrl(url) {
   return trimmed;
 }
 
+function getSignatureButtonLabel(hasSignature) {
+  return hasSignature ? '點擊重新簽名' : '點擊簽名';
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
   const loginSection = document.getElementById('login-section');
@@ -363,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutBtn = document.getElementById('logout-btn');
 
   const eventsListEl = document.getElementById('events-list');
+  const eventsLoadingEl = document.getElementById('events-loading');
   const eventsEmptyEl = document.getElementById('events-empty');
 
   const eventDetailSection = document.getElementById('event-detail-section');
@@ -394,6 +399,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLoggedOutView() {
     setHidden(studentSection, true);
     setHidden(loginSection, false);
+    setHidden(eventDetailSection, true);
+    if (eventsLoadingEl) {
+      eventsLoadingEl.classList.add('hidden');
+    }
+    eventsEmptyEl.classList.add('hidden');
+    eventStatusMessageEl.textContent = '';
+  }
+
+  function setEventsLoading(isLoading) {
+    if (!eventsLoadingEl) return;
+    eventsLoadingEl.classList.toggle('hidden', !isLoading);
   }
 
   function buildClassOptions() {
@@ -525,18 +541,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   logoutBtn.addEventListener('click', () => {
+    if (!window.confirm('確認登出?')) {
+      return;
+    }
+
     clearStudentSession();
     _eventsCache = [];
     _latestCache = [];
     _currentEvent = null;
     eventsListEl.innerHTML = '';
-    setHidden(eventDetailSection, true);
+    setEventsLoading(false);
+    eventsEmptyEl.classList.add('hidden');
 
     if (loginForm) {
       loginForm.reset();
     }
     buildClassOptions();
     buildNameOptions('', null);
+    renderLoggedOutView();
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     showToast('已登出');
   });
@@ -554,6 +577,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const session = getStudentSession();
     if (!session) return;
 
+    setEventsLoading(true);
+    eventsEmptyEl.classList.add('hidden');
+    eventsListEl.innerHTML = '';
+
     try {
       const [evRes, latestRes] = await Promise.all([
         getEvents(session.class, session.name),
@@ -569,6 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderEventsList();
     } catch (err) {
       console.error(err);
+      setEventsLoading(false);
       showToast('載入活動資料失敗');
     }
   }
@@ -578,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderEventsList() {
+    setEventsLoading(false);
     eventsListEl.innerHTML = '';
     if (!_eventsCache.length) {
       eventsEmptyEl.classList.remove('hidden');
@@ -852,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (field.type === 'select') {
         const select = document.createElement('select');
         select.name = field.id;
-        select.className = 'form-input';
+        select.className = 'form-input form-select-modern';
 
         const current = (existingAnswer && existingAnswer[field.id]) || '';
         const placeholder = document.createElement('option');
@@ -879,8 +908,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const openBtn = document.createElement('button');
         openBtn.type = 'button';
-        openBtn.className = 'btn secondary small';
-        openBtn.textContent = existingDataUrl ? '?蝪賢?' : '暺?蝪賢?';
+        openBtn.className = 'btn secondary small signature-trigger-btn';
+        openBtn.textContent = getSignatureButtonLabel(!!existingDataUrl);
 
         const preview = document.createElement('div');
         preview.className = 'signature-preview';
@@ -948,12 +977,11 @@ document.addEventListener('DOMContentLoaded', () => {
           if (state.value) {
             state.img.src = state.value;
             state.preview.classList.remove('hidden');
-            state.openBtn.textContent = '重新簽名';
           } else {
             state.img.src = '';
             state.preview.classList.add('hidden');
-            state.openBtn.textContent = '開始簽名';
           }
+          state.openBtn.textContent = getSignatureButtonLabel(!!state.value);
           state.openBtn.disabled = false;
         }
 
@@ -1198,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const countInput = document.createElement('select');
         countInput.name = 'parentBusCount';
-        countInput.className = 'reply-parent-count-input';
+        countInput.className = 'reply-parent-count-input form-select-modern';
 
         const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
@@ -1266,8 +1294,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const openBtn = document.createElement('button');
       openBtn.type = 'button';
-      openBtn.className = 'btn secondary small';
-      openBtn.textContent = existingSig ? '重新簽名' : '開始簽名';
+      openBtn.className = 'btn secondary small signature-trigger-btn';
+      openBtn.textContent = getSignatureButtonLabel(!!existingSig);
 
       const preview = document.createElement('div');
       preview.className = 'signature-preview';
@@ -1336,12 +1364,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.value) {
           state.img.src = state.value;
           state.preview.classList.remove('hidden');
-          state.openBtn.textContent = '重新簽名';
         } else {
           state.img.src = '';
           state.preview.classList.add('hidden');
-          state.openBtn.textContent = '開始簽名';
         }
+        state.openBtn.textContent = getSignatureButtonLabel(!!state.value);
         state.openBtn.disabled = false;
       }
 

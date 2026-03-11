@@ -53,4 +53,5 @@ function getAdminSession() {
 
 function clearAdminSession() {
   try { sessionStorage.removeItem(STORAGE_KEYS.admin); } catch (e) {}
+  try { localStorage.removeItem(STORAGE_KEYS.admin); } catch (e) {}
 }

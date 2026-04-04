@@ -137,7 +137,7 @@ function isConsentEvent(ev){
 const BUS_TRIP_EVENT_IDS = ['20260307-consent', '20260307c-consent', '20260316a-consent', '20260316b-consent', '20260316c-consent', '20260412a-consent', '20260412b-consent'];
 
   // 依據活動 ID 判斷是否為家長出席統計活動，這裡列出所有相關活動 ID，未來如果有新增家長出席統計活動，再將其 ID 加入此陣列即可
-const PARENT_BUS_EVENT_IDS = ['20260316a-consent', '20260316b-consent', '20260316c-consent', '20260412a-consent', '20260412b-consent'];
+const PARENT_BUS_EVENT_IDS = ['20260316a-consent', '20260316b-consent', '20260316c-consent', '20260412a-consent', '20260412b-consent', '20260412c-consent'];
 
 const EVENT_CUSTOM_DESCRIPTIONS = {
   // 依活動 ID 客製化補充說明，可自由調整文字與換行（使用 \n）

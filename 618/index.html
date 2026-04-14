@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>618 成發回覆表單</title>
+    <style>
+      :root {
+        --bg: linear-gradient(180deg, #f4f7fb 0%, #eef3ff 100%);
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --border: #d7deea;
+        --ok: #047857;
+        --err: #b91c1c;
+        --shadow: 0 16px 40px rgba(37, 99, 235, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-text-size-adjust: 100%;
+        touch-action: manipulation;
+      }
+
+      body.is-submitted {
+        overflow: hidden;
+      }
+
+      .wrap {
+        max-width: 780px;
+        margin: 32px auto;
+        padding: 0 16px 32px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+        text-align: center;
+      }
+
+      .sub {
+        margin: 0 0 24px;
+        color: var(--muted);
+        line-height: 1.7;
+        text-align: center;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .row2 {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 16px;
+        background: #fff;
+      }
+
+      select:focus,
+      textarea:focus {
+        outline: 2px solid rgba(37, 99, 235, 0.18);
+        border-color: var(--primary);
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: none;
+      }
+
+      .section {
+        margin-top: 22px;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 18px;
+      }
+
+      .section h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        text-align: center;
+      }
+
+      .hint {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+        text-align: center;
+      }
+
+      .choice-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .choice-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #fafcff;
+        overflow: hidden;
+      }
+
+      .choice {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px 16px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+      }
+
+      .choice:hover {
+        background: #f3f7ff;
+      }
+
+      .choice-input {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        border: 2px solid #9ca3af;
+        border-radius: 6px;
+        background: #fff;
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .choice-input::after {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        background: #fff;
+        transform: scale(0);
+        transition: transform 0.15s ease;
+      }
+
+      .choice-input:checked {
+        border-color: var(--primary);
+        background: var(--primary);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+      }
+
+      .choice-input:checked::after {
+        transform: scale(1);
+      }
+
+      .choice-input:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.22);
+        outline-offset: 2px;
+      }
+
+      .choice-text {
+        min-width: 32px;
+        text-align: center;
+      }
+
+      .actions {
+        margin-top: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      button {
+        min-width: 180px;
+        border: none;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 12px;
+        padding: 11px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+      }
+
+      button:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      #status {
+        min-height: 20px;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .ok {
+        color: var(--ok);
+      }
+
+      .err {
+        color: var(--err);
+      }
+
+      .success-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        padding: 24px;
+      }
+
+      .success-overlay.is-visible {
+        display: flex;
+      }
+
+      .success-panel {
+        width: min(360px, 100%);
+        background: rgba(255, 255, 255, 0.96);
+        border-radius: 20px;
+        padding: 28px 24px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+      }
+
+      .success-title {
+        margin: 0 0 18px;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      @media (max-width: 640px) {
+        .row2 {
+          grid-template-columns: 1fr;
+        }
+
+        .card {
+          padding: 22px 18px;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>618 成發回覆表單</h1>
+        <p class="sub">請先選擇班級與姓名</p>
+
+        <form id="replyForm">
+          <div class="grid row2">
+            <div class="field">
+              <label for="classSelect">班級</label>
+              <select id="classSelect" required>
+                <option value="">請選擇班級</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="nameSelect">姓名</label>
+              <select id="nameSelect" required disabled>
+                <option value="">請先選擇班級</option>
+              </select>
+            </div>
+          </div>
+
+          <section class="section">
+            <h2>1. 是否購買 USB</h2>
+            <p class="hint">如需加購，請於下方備註。</p>
+            <div class="choice-grid">
+              <div class="choice-card">
+                <label class="choice" for="usbYes">
+                  <input class="choice-input" type="radio" name="usbPurchase" id="usbYes" value="是" required />
+                  <span class="choice-text">是</span>
+                </label>
+              </div>
+              <div class="choice-card">
+                <label class="choice" for="usbNo">
+                  <input class="choice-input" type="radio" name="usbPurchase" id="usbNo" value="否" required />
+                  <span class="choice-text">否</span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>2. 「學生」是否搭乘回程遊覽車</h2>
+            <p class="hint">若當天結束後家長要接走孩子，為確定遊覽車數量，請確認是否需搭乘遊覽車回校<br>*若家長也需搭乘請於備註欄留言*</p>
+            <div class="choice-grid">
+              <div class="choice-card">
+                <label class="choice" for="busBackYes">
+                  <input class="choice-input" type="radio" name="busBackChoice" id="busBackYes" value="是" required />
+                  <span class="choice-text">是</span>
+                </label>
+              </div>
+              <div class="choice-card">
+                <label class="choice" for="busBackNo">
+                  <input class="choice-input" type="radio" name="busBackChoice" id="busBackNo" value="否" required />
+                  <span class="choice-text">否</span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>3. 是否拍攝個人形象照</h2>
+            <p class="hint">550元/人，照片會單獨提供留檔</p>
+            <div class="choice-grid">
+              <div class="choice-card">
+                <label class="choice" for="portraitYes">
+                  <input class="choice-input" type="radio" name="portrait" id="portraitYes" value="是" required />
+                  <span class="choice-text">是</span>
+                </label>
+              </div>
+              <div class="choice-card">
+                <label class="choice" for="portraitNo">
+                  <input class="choice-input" type="radio" name="portrait" id="portraitNo" value="否" required />
+                  <span class="choice-text">否</span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>其他備註</h2>
+            <textarea id="mainRemark" placeholder="例如：加購USB、補充說明，都可以留言在這裡"></textarea>
+          </section>
+
+          <div class="actions">
+            <button type="submit" id="submitBtn">送出回覆</button>
+            <span id="status"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="success-overlay" id="successOverlay" aria-hidden="true">
+      <div class="success-panel">
+        <p class="success-title">成功送出</p>
+        <button type="button" id="resetFormButton">重新填寫</button>
+      </div>
+    </div>
+
+    <script>
+      const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzYiC4JNYh6dCJb98iM4h2atzmfWB0XPRia3bBbbjsBbD0p0qpmCb4F1WiEUD7nemrF/exec";
+      const classSelect = document.getElementById("classSelect");
+      const nameSelect = document.getElementById("nameSelect");
+      const form = document.getElementById("replyForm");
+      const statusEl = document.getElementById("status");
+      const submitBtn = document.getElementById("submitBtn");
+      const successOverlay = document.getElementById("successOverlay");
+      const resetFormButton = document.getElementById("resetFormButton");
+      let rosterMap = {};
+      let jsonpSeed = 0;
+
+      function setStatus(message, type = "") {
+        statusEl.textContent = message;
+        statusEl.className = type;
+      }
+
+      function normalizeRosterMap(source) {
+        const map = {};
+        if (!source || typeof source !== "object") {
+          return map;
+        }
+
+        Object.entries(source).forEach(([className, names]) => {
+          const cleanClass = String(className || "").trim();
+          if (!cleanClass || !Array.isArray(names)) return;
+
+          const cleanNames = [...new Set(
+            names
+              .map((name) => String(name || "").trim())
+              .filter(Boolean)
+          )].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+
+          if (cleanNames.length > 0) {
+            map[cleanClass] = cleanNames;
+          }
+        });
+
+        return map;
+      }
+
+      function fillClassOptions() {
+        const classes = Object.keys(rosterMap).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+        classSelect.innerHTML = '<option value="">請選擇班級</option>';
+        classes.forEach((cls) => {
+          const option = document.createElement("option");
+          option.value = cls;
+          option.textContent = cls;
+          classSelect.appendChild(option);
+        });
+      }
+
+      function fillNameOptions(selectedClass) {
+        nameSelect.disabled = !selectedClass;
+        if (!selectedClass) {
+          nameSelect.innerHTML = '<option value="">請先選擇班級</option>';
+          return;
+        }
+
+        const names = rosterMap[selectedClass] || [];
+        nameSelect.innerHTML = '<option value="">請選擇姓名</option>';
+        names.forEach((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          nameSelect.appendChild(option);
+        });
+      }
+
+      function extractErrorMessage(text, status) {
+        if (!text) {
+          return `伺服器回傳錯誤（HTTP ${status || "未知"}）。`;
+        }
+
+        const typeErrorMatch = text.match(/TypeError:[^<\n]+/i);
+        if (typeErrorMatch) {
+          return typeErrorMatch[0].trim();
+        }
+
+        const genericErrorMatch = text.match(/(?:Error|Exception):[^<\n]+/i);
+        if (genericErrorMatch) {
+          return genericErrorMatch[0].trim();
+        }
+
+        return `伺服器回傳非 JSON 內容（HTTP ${status || "未知"}）。`;
+      }
+
+      async function readJsonResponse(resp) {
+        const text = await resp.text();
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error(extractErrorMessage(text, resp.status));
+        }
+      }
+
+      function fetchRosterViaJsonp() {
+        return new Promise((resolve, reject) => {
+          const callbackName = `__rosterCallback_${Date.now()}_${++jsonpSeed}`;
+          const script = document.createElement("script");
+          let finished = false;
+
+          function cleanup() {
+            if (finished) return;
+            finished = true;
+            delete window[callbackName];
+            script.remove();
+            clearTimeout(timer);
+          }
+
+          window[callbackName] = (payload) => {
+            cleanup();
+            resolve(payload);
+          };
+
+          script.onerror = () => {
+            cleanup();
+            reject(new Error("無法以 JSONP 載入名單。"));
+          };
+
+          const timer = window.setTimeout(() => {
+            cleanup();
+            reject(new Error("名單載入逾時。"));
+          }, 15000);
+
+          script.src = `${GAS_WEB_APP_URL}?action=roster&callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
+          document.body.appendChild(script);
+        });
+      }
+
+      async function fetchRoster() {
+        if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+          setStatus("請先設定 GAS_WEB_APP_URL。", "err");
+          classSelect.innerHTML = '<option value="">尚未設定 GAS URL</option>';
+          return;
+        }
+
+        setStatus("載入名單中...", "");
+
+        try {
+          let data;
+          try {
+            const resp = await fetch(`${GAS_WEB_APP_URL}?action=roster&_=${Date.now()}`);
+            data = await readJsonResponse(resp);
+          } catch (fetchError) {
+            data = await fetchRosterViaJsonp();
+          }
+
+          if (!data || !data.ok) {
+            throw new Error((data && data.message) || "名單載入失敗。");
+          }
+
+          rosterMap = normalizeRosterMap(data.roster);
+          fillClassOptions();
+          fillNameOptions("");
+
+          const classCount = Object.keys(rosterMap).length;
+          const studentCount = Object.values(rosterMap).reduce((sum, names) => sum + names.length, 0);
+          if (studentCount === 0) {
+            setStatus("名單已載入，但目前沒有可選資料。", "err");
+            return;
+          }
+
+          setStatus(`名單載入完成，共 ${classCount} 個班級、${studentCount} 位學生。`, "ok");
+        } catch (error) {
+          setStatus(`名單載入失敗：${error.message}`, "err");
+          classSelect.innerHTML = '<option value="">名單載入失敗</option>';
+          fillNameOptions("");
+        }
+      }
+
+      function refreshPageBypassCache() {
+        const refreshUrl = new URL(window.location.href);
+        refreshUrl.searchParams.set("_", String(Date.now()));
+        window.location.replace(refreshUrl.toString());
+      }
+
+      function preventZoomGestures(event) {
+        event.preventDefault();
+      }
+
+      function preventPinchZoom(event) {
+        if (event.touches && event.touches.length > 1) {
+          event.preventDefault();
+        }
+      }
+
+      function showSuccessOverlay() {
+        document.body.classList.add("is-submitted");
+        successOverlay.classList.add("is-visible");
+        successOverlay.setAttribute("aria-hidden", "false");
+      }
+
+      classSelect.addEventListener("change", (event) => {
+        fillNameOptions(event.target.value);
+      });
+
+      resetFormButton.addEventListener("click", refreshPageBypassCache);
+      document.addEventListener("gesturestart", preventZoomGestures, { passive: false });
+      document.addEventListener("gesturechange", preventZoomGestures, { passive: false });
+      document.addEventListener("gestureend", preventZoomGestures, { passive: false });
+      document.addEventListener("touchmove", preventPinchZoom, { passive: false });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+          setStatus("請先設定 GAS_WEB_APP_URL。", "err");
+          return;
+        }
+
+        const formData = new FormData(form);
+        const selectedClass = classSelect.value;
+        const studentName = nameSelect.value;
+        const usbChoice = String(formData.get("usbPurchase") || "");
+        const busBackChoice = String(formData.get("busBackChoice") || "");
+        const portrait = String(formData.get("portrait") || "");
+
+        if (!selectedClass || !studentName) {
+          setStatus("請先選擇班級與姓名。", "err");
+          return;
+        }
+
+        const payload = {
+          className: selectedClass,
+          studentName,
+          buyUsb: usbChoice,
+          busBack: busBackChoice,
+          portrait,
+          remark: document.getElementById("mainRemark").value.trim(),
+        };
+
+        submitBtn.disabled = true;
+        setStatus("送出中...", "");
+
+        try {
+          const resp = await fetch(GAS_WEB_APP_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await readJsonResponse(resp);
+          if (!data.ok) {
+            throw new Error(data.message || "送出失敗。");
+          }
+
+          setStatus("");
+          showSuccessOverlay();
+        } catch (error) {
+          setStatus(`送出失敗：${error.message}`, "err");
+          submitBtn.disabled = false;
+        }
+      });
+
+      fetchRoster();
+    </script>
+  </body>
+</html>
